@@ -42,6 +42,13 @@ const KEY_CONFIGS: KeyConfig[] = [
     condition: (c) => c.has_systemeio,
   },
   {
+    key: "webinarkit_api_key",
+    label: "WebinarKit API Key",
+    description: "Used to pull webinar registrations, attendance, replays, and conversion data from WebinarKit.",
+    placeholder: "Your WebinarKit API key",
+    condition: (c) => c.has_webinarkit,
+  },
+  {
     key: "meta_ads_account_id",
     label: "Meta Ads Account ID",
     description: "Facebook/Instagram Ads account ID used in Windsor.ai. Verify this matches the correct client.",
