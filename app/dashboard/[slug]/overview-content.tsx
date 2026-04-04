@@ -6,6 +6,7 @@ import { KPICardTinted } from "@/components/dashboard/KPICardTinted";
 import { RevenueVsFailedChart } from "@/components/dashboard/RevenueVsFailedChart";
 import { PerformanceTrendChart } from "@/components/dashboard/PerformanceTrendChart";
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
+import { ProductSalesChart } from "@/components/dashboard/ProductSalesChart";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { OverviewData } from "@/types/dashboard";
@@ -51,6 +52,11 @@ export function OverviewContent({ slug }: { slug: string }) {
             <KPICard label="Abandoned" value={data.paystack.abandonedFormatted} badge={data.paystack.abandonedBadge} direction="down" />
           </div>
         </div>
+      )}
+
+      {/* Product Revenue Breakdown */}
+      {(data as Record<string, unknown>).productBreakdown && (
+        <ProductSalesChart data={((data as Record<string, unknown>).productBreakdown as { name: string; count: number }[])} />
       )}
 
       {/* Missed Revenue */}
