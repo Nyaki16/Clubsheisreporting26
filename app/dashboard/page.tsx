@@ -5,11 +5,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
   const supabase = getServiceClient();
-  const { data: clients = [] } = await supabase
+  const { data } = await supabase
     .from("clients")
     .select("*")
     .eq("is_active", true)
     .order("name");
+  const clients = data || [];
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAF7F2" }}>
