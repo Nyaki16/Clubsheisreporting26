@@ -72,12 +72,12 @@ export function MetaContent({ slug }: { slug: string }) {
                   {data.campaigns.map((c) => (
                     <tr key={c.name} className="border-b border-gray-100 last:border-0">
                       <td className="py-3 pr-4 font-medium text-gray-900">{c.name}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">R {c.spend.toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.impressions.toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.clicks.toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.ctr}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.cpc}</td>
-                      <td className="py-3 pl-3 text-right text-gray-700">{c.reach.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right text-gray-700">R {(c.spend || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right text-gray-700">{(c.impressions || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right text-gray-700">{(c.clicks || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right text-gray-700">{c.ctr || "—"}</td>
+                      <td className="py-3 px-3 text-right text-gray-700">{c.cpc || "—"}</td>
+                      <td className="py-3 pl-3 text-right text-gray-700">{(c.reach || 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
