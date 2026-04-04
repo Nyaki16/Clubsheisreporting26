@@ -84,9 +84,9 @@ const data = {
   // Paystack: { client: { month: { revenue, successTxns, failedTxns, abandonedTxns, reversedTxns } } }
   ps: {
     csi: {
-      jan: { rev: 18736, success: 64, failed: 123, abandoned: 14, reversed: 0 },
-      feb: { rev: 21292, success: 54, failed: 110, abandoned: 3, reversed: 2 },
-      mar: { rev: 24486, success: 59, failed: 128, abandoned: 15, reversed: 0 },
+      jan: { rev: 18736, success: 64, failed: 123, abandoned: 14, reversed: 0, members: 62, memberBreakdown: "17×R149 + 45×R349" },
+      feb: { rev: 21292, success: 54, failed: 110, abandoned: 3, reversed: 2, members: 56, memberBreakdown: "18×R149 + 38×R349" },
+      mar: { rev: 24486, success: 59, failed: 128, abandoned: 15, reversed: 0, members: 57, memberBreakdown: "15×R149 + 42×R349" },
       subs: { active: 214, attention: 156, nonRenewing: 26, cancelled: 183 },
       plans: "103×R149 + 111×R349 (memberships only)",
     },
@@ -189,8 +189,8 @@ function buildOverview(clientKey, month, prevMonth) {
     result.paystack = {
       revenue: ps.rev, revenueFormatted: fmtR(ps.rev),
       revenueBadge: `↑ ${ps.success} successful payments`,
-      activeMemberships: psSubs?.active,
-      membershipBreakdown: data.ps[c]?.plans || (psSubs ? `${psSubs.active} active + ${psSubs.attention} attention + ${psSubs.nonRenewing} non-renewing` : undefined),
+      activeMemberships: ps.members || psSubs?.active,
+      membershipBreakdown: ps.memberBreakdown || data.ps[c]?.plans || (psSubs ? `${psSubs.active} active` : undefined),
       failedAmount: 0, failedFormatted: `${ps.failed} failed txns`, failedBadge: "↓ Recovery opportunity",
       abandonedAmount: 0, abandonedFormatted: `${ps.abandoned} abandoned`, abandonedBadge: "↓ Checkout not completed",
     };
@@ -280,7 +280,7 @@ function buildPaystack(clientKey, month) {
     revenue: ps.rev, revenueFormatted: fmtR(ps.rev),
     kpis: [
       { label: "Paystack Revenue", value: fmtR(ps.rev), badge: `↑ ${ps.success} successful payments`, direction: "up" },
-      { label: "Active Memberships", value: subs ? fmt(subs.active) : "—", badge: data.ps[clientKey]?.plans || "→ Currently active", direction: "neutral" },
+      { label: "Active Memberships", value: ps.members ? fmt(ps.members) : (subs ? fmt(subs.active) : "—"), badge: ps.memberBreakdown || data.ps[clientKey]?.plans || "→ Currently active", direction: "neutral" },
       { label: "Needs Attention", value: subs ? fmt(subs.attention) : "—", badge: "↓ Failed billing", direction: "down" },
       { label: "Failed Payments", value: `${ps.failed} txns`, badge: "↓ Declined transactions", direction: "down" },
       { label: "Abandoned", value: `${ps.abandoned} txns`, badge: "↓ Incomplete checkouts", direction: "down" },
