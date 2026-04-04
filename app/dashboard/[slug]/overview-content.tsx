@@ -55,9 +55,11 @@ export function OverviewContent({ slug }: { slug: string }) {
       )}
 
       {/* Product Revenue Breakdown */}
-      {(data as Record<string, unknown>).productBreakdown && (
-        <ProductSalesChart data={((data as Record<string, unknown>).productBreakdown as { name: string; count: number }[])} />
-      )}
+      {(() => {
+        const d = data as unknown as Record<string, unknown>;
+        const products = d.productBreakdown as { name: string; count: number }[] | undefined;
+        return products && products.length > 0 ? <ProductSalesChart data={products} /> : null;
+      })()}
 
       {/* Missed Revenue */}
       {data.missedRevenue && (
