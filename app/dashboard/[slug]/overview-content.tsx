@@ -8,6 +8,7 @@ import { PerformanceTrendChart } from "@/components/dashboard/PerformanceTrendCh
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
 import { ProductSalesChart } from "@/components/dashboard/ProductSalesChart";
 import { OtherRevenue } from "@/components/dashboard/OtherRevenue";
+import { EmailHighlights } from "@/components/dashboard/EmailHighlights";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { OverviewData } from "@/types/dashboard";
@@ -118,6 +119,9 @@ export function OverviewContent({ slug }: { slug: string }) {
           </div>
         </div>
       )}
+
+      {/* Email Highlights */}
+      <EmailHighlights slug={slug} />
     </div>
   );
 }
