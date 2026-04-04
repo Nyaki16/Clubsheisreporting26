@@ -228,15 +228,15 @@ function buildOverview(clientKey, month, prevMonth) {
     kpis.push({ label: "Systeme.io Revenue", value: fmtR(sysRev.rev), badge: `↑ ${sysRev.label}`, direction: "up", icon: "dollar" });
   }
 
-  // Systeme.io product breakdown
-  if (sysRev?.products) {
-    result.productBreakdown = sysRev.products;
-  }
-
   // Email Leads (Palesa only - Systeme.io total)
   if (c === "pal") kpis.push({ label: "Email Leads", value: "37,145", badge: "↑ Systeme.io total", direction: "up", icon: "mail" });
 
   const result = { kpis };
+
+  // Systeme.io product breakdown
+  if (sysRev?.products) {
+    result.productBreakdown = sysRev.products;
+  }
 
   // Paystack section
   if (ps) {
