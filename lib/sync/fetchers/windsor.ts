@@ -2,19 +2,19 @@ import { WindsorMetaAdsData, WindsorFBOrganicData, WindsorInstagramData, GHLReve
 
 const WINDSOR_BASE = "https://connectors.windsor.ai/all";
 
-async function windsorQuery(params: Record<string, string>): Promise<Record<string, unknown>[]> {
+async function windsorQuery(fields: string, dateFrom: string, dateTo: string): Promise<Record<string, unknown>[]> {
   const apiKey = process.env.WINDSOR_API_KEY;
   if (!apiKey) throw new Error("WINDSOR_API_KEY not set");
 
   const url = new URL(WINDSOR_BASE);
   url.searchParams.set("api_key", apiKey);
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, v);
-  }
+  url.searchParams.set("fields", fields);
+  url.searchParams.set("date_from", dateFrom);
+  url.searchParams.set("date_to", dateTo);
 
   const res = await fetch(url.toString());
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(`Windsor API error ${res.status}: ${text.slice(0, 200)}`);
   }
   const json = await res.json();
@@ -29,15 +29,16 @@ export async function fetchMetaAds(
   if (!accountIds.length) return null;
 
   try {
-    const rows = await windsorQuery({
-      connector: "facebook",
-      date_from: dateFrom,
-      date_to: dateTo,
-      fields: "spend,impressions,clicks,reach,campaign_name,account_id",
-    });
+    const rows = await windsorQuery(
+      "source,spend,impressions,clicks,reach,campaign,account_id",
+      dateFrom,
+      dateTo
+    );
 
-    // Filter to our account IDs
-    const filtered = rows.filter(r => accountIds.includes(String(r.account_id || "")));
+    // Filter to facebook source and our account IDs
+    const filtered = rows.filter(
+      r => String(r.source) === "facebook" && accountIds.includes(String(r.account_id || ""))
+    );
     if (!filtered.length) return null;
 
     const spend = filtered.reduce((s, r) => s + (Number(r.spend) || 0), 0);
@@ -48,7 +49,7 @@ export async function fetchMetaAds(
     // Group by campaign
     const campaignMap = new Map<string, { spend: number; impressions: number; clicks: number; reach: number }>();
     for (const r of filtered) {
-      const name = String(r.campaign_name || "Unknown");
+      const name = String(r.campaign || "Unknown");
       const existing = campaignMap.get(name) || { spend: 0, impressions: 0, clicks: 0, reach: 0 };
       existing.spend += Number(r.spend) || 0;
       existing.impressions += Number(r.impressions) || 0;
@@ -91,17 +92,17 @@ export async function fetchFacebookOrganic(
   if (!pageId) return null;
 
   try {
-    const rows = await windsorQuery({
-      connector: "facebook_organic",
-      date_from: dateFrom,
-      date_to: dateTo,
-      fields: "page_fans,impressions,engagements,account_id",
-    });
+    const rows = await windsorQuery(
+      "source,page_fans,impressions,engagements,account_id",
+      dateFrom,
+      dateTo
+    );
 
+    // Filter to facebook_organic and our page ID
+    // Windsor returns facebook_organic as source, or the data may be mixed — filter by account_id
     const filtered = rows.filter(r => String(r.account_id || "") === pageId);
     if (!filtered.length) return null;
 
-    // page_fans is typically the latest value, not a sum
     const fans = Math.max(...filtered.map(r => Number(r.page_fans) || 0));
     const impressions = filtered.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
     const engagements = filtered.reduce((s, r) => s + (Number(r.engagements) || 0), 0);
@@ -121,18 +122,17 @@ export async function fetchInstagramData(
   if (!accountId) return null;
 
   try {
-    const rows = await windsorQuery({
-      connector: "instagram",
-      date_from: dateFrom,
-      date_to: dateTo,
-      fields: "reach,followers,account_id",
-    });
+    const rows = await windsorQuery(
+      "source,reach,followers_count,account_id",
+      dateFrom,
+      dateTo
+    );
 
     const filtered = rows.filter(r => String(r.account_id || "") === accountId);
     if (!filtered.length) return null;
 
     const reach = filtered.reduce((s, r) => s + (Number(r.reach) || 0), 0);
-    const followers = Math.max(...filtered.map(r => Number(r.followers) || 0));
+    const followers = Math.max(...filtered.map(r => Number(r.followers_count) || 0));
 
     return {
       reach,
@@ -153,22 +153,23 @@ export async function fetchGHLRevenue(
   if (!locationId) return null;
 
   try {
-    const rows = await windsorQuery({
-      connector: "gohighlevel",
-      date_from: dateFrom,
-      date_to: dateTo,
-      fields: "revenue,transactions,account_id",
-    });
+    const rows = await windsorQuery(
+      "source,transaction_amount,transaction_status,account_id",
+      dateFrom,
+      dateTo
+    );
 
-    const filtered = rows.filter(r => String(r.account_id || "") === locationId);
+    // Filter to GHL transactions for this location, only succeeded
+    const filtered = rows.filter(
+      r => String(r.account_id || "") === locationId && String(r.transaction_status) === "succeeded"
+    );
     if (!filtered.length) return null;
 
-    const revenue = filtered.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
-    const txnCount = filtered.reduce((s, r) => s + (Number(r.transactions) || 0), 0);
+    const revenue = filtered.reduce((s, r) => s + (Number(r.transaction_amount) || 0), 0);
+    const txnCount = filtered.length;
 
     if (revenue === 0) return null;
 
-    // For W&W, GHL revenue represents new subscribers at R149
     if (isWW) {
       const newSubs = Math.floor(revenue / 149);
       return {
@@ -180,11 +181,10 @@ export async function fetchGHLRevenue(
       };
     }
 
-    const label = txnCount > 0 ? `${txnCount} transactions` : "Aggregated";
     return {
       revenue: Math.round(revenue),
       transactionCount: txnCount,
-      label,
+      label: txnCount > 0 ? `${txnCount} transactions` : "Aggregated",
     };
   } catch (e) {
     console.error("fetchGHLRevenue error:", e);
