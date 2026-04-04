@@ -98,9 +98,9 @@ const data = {
       plans: "31×R2200 IC + 30×R2200 Mastery + 10×R3200 + 9×R2466 + others",
     },
     ww: {
-      jan: { rev: 232738, success: 1527, failed: 319, abandoned: 473, reversed: 13 },
-      feb: { rev: 200554, success: 870, failed: 309, abandoned: 151, reversed: 19 },
-      mar: { rev: 180886, success: 1193, failed: 419, abandoned: 106, reversed: 13 },
+      jan: { rev: 232738, success: 1527, failed: 319, abandoned: 473, reversed: 13, members: 1562, memberBreakdown: "1,562 × R149" },
+      feb: { rev: 200554, success: 870, failed: 309, abandoned: 151, reversed: 19, members: 1346, memberBreakdown: "1,346 × R149" },
+      mar: { rev: 180886, success: 1193, failed: 419, abandoned: 106, reversed: 13, members: 1214, memberBreakdown: "1,214 × R149" },
       subs: { active: 1550, attention: 422, nonRenewing: 36, cancelled: 2799 },
       plans: "1,550 × R149/month",
     },
