@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getClients } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardPage() {
   const clients = await getClients();
 
