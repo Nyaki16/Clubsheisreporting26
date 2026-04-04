@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useDashboardData } from "@/lib/use-dashboard-data";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
@@ -10,23 +9,7 @@ import type { MetaData } from "@/types/dashboard";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export function MetaContent({ slug }: { slug: string }) {
-  const [data, setData] = useState<MetaData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: client } = await supabase.from("clients").select("id").eq("slug", slug).single();
-      if (!client) { setLoading(false); return; }
-      const { data: period } = await supabase.from("reporting_periods").select("id").eq("is_current", true).single();
-      if (!period) { setLoading(false); return; }
-      const { data: section } = await supabase
-        .from("dashboard_data").select("data")
-        .eq("client_id", client.id).eq("period_id", period.id).eq("section", "meta").single();
-      if (section?.data) setData(section.data as MetaData);
-      setLoading(false);
-    }
-    load();
-  }, [slug]);
+  const { data, loading } = useDashboardData<MetaData>(slug, "meta");
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="No Meta Ads data available. This client may not have Meta Ads connected." />;

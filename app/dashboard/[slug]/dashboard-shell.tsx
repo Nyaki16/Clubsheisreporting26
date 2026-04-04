@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TabNavigation } from "@/components/dashboard/TabNavigation";
@@ -14,6 +14,7 @@ interface Props {
 
 export function DashboardShell({ slug, children }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [clientName, setClientName] = useState("");
   const [periodLabel, setPeriodLabel] = useState("");
   const [currentPeriodId, setCurrentPeriodId] = useState("");
@@ -30,14 +31,18 @@ export function DashboardShell({ slug, children }: Props) {
     if (clientRes.data) setClientName(clientRes.data.name);
     if (periodsRes.data) {
       setPeriods(periodsRes.data.map((p) => ({ id: p.id, label: p.label })));
-      const current = periodsRes.data.find((p) => p.is_current);
-      if (current) {
-        setCurrentPeriodId(current.id);
-        setPeriodLabel(current.label);
+      // Use period from URL if present, otherwise use is_current
+      const urlPeriod = searchParams.get("period");
+      const selected = urlPeriod
+        ? periodsRes.data.find((p) => p.id === urlPeriod)
+        : periodsRes.data.find((p) => p.is_current);
+      if (selected) {
+        setCurrentPeriodId(selected.id);
+        setPeriodLabel(selected.label);
       }
     }
     if (clientsRes.data) setClients(clientsRes.data.map((c) => ({ slug: c.slug, name: c.name })));
-  }, [slug]);
+  }, [slug, searchParams]);
 
   useEffect(() => {
     loadData();
@@ -55,6 +60,8 @@ export function DashboardShell({ slug, children }: Props) {
           setCurrentPeriodId(id);
           const p = periods.find((pp) => pp.id === id);
           if (p) setPeriodLabel(p.label);
+          // Update URL so content components refetch
+          router.push(`/dashboard/${slug}?period=${id}`);
         }}
         onClientChange={(newSlug) => router.push(`/dashboard/${newSlug}`)}
       />

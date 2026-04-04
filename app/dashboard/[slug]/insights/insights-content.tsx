@@ -1,30 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useDashboardData } from "@/lib/use-dashboard-data";
 import { InsightCard } from "@/components/dashboard/InsightCard";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { InsightsData } from "@/types/dashboard";
 
 export function InsightsContent({ slug }: { slug: string }) {
-  const [data, setData] = useState<InsightsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: client } = await supabase.from("clients").select("id").eq("slug", slug).single();
-      if (!client) { setLoading(false); return; }
-      const { data: period } = await supabase.from("reporting_periods").select("id").eq("is_current", true).single();
-      if (!period) { setLoading(false); return; }
-      const { data: section } = await supabase
-        .from("dashboard_data").select("data")
-        .eq("client_id", client.id).eq("period_id", period.id).eq("section", "insights").single();
-      if (section?.data) setData(section.data as InsightsData);
-      setLoading(false);
-    }
-    load();
-  }, [slug]);
+  const { data, loading } = useDashboardData<InsightsData>(slug, "insights");
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="No insights available yet. Data will be generated after the next sync." />;

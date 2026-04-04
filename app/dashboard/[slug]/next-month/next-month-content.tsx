@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useDashboardData } from "@/lib/use-dashboard-data";
 import { RecommendationCard } from "@/components/dashboard/RecommendationCard";
 import { TargetsTable } from "@/components/dashboard/TargetsTable";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
@@ -9,23 +8,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { NextMonthData } from "@/types/dashboard";
 
 export function NextMonthContent({ slug }: { slug: string }) {
-  const [data, setData] = useState<NextMonthData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: client } = await supabase.from("clients").select("id").eq("slug", slug).single();
-      if (!client) { setLoading(false); return; }
-      const { data: period } = await supabase.from("reporting_periods").select("id").eq("is_current", true).single();
-      if (!period) { setLoading(false); return; }
-      const { data: section } = await supabase
-        .from("dashboard_data").select("data")
-        .eq("client_id", client.id).eq("period_id", period.id).eq("section", "nextMonth").single();
-      if (section?.data) setData(section.data as NextMonthData);
-      setLoading(false);
-    }
-    load();
-  }, [slug]);
+  const { data, loading } = useDashboardData<NextMonthData>(slug, "nextMonth");
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="Next month recommendations will be generated after the next sync." />;

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useDashboardSections } from "@/lib/use-dashboard-data";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { KPICardTinted } from "@/components/dashboard/KPICardTinted";
 import { ContactsBySourceChart } from "@/components/dashboard/ContactsBySourceChart";
@@ -15,28 +14,9 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { GHLData, SystemeData } from "@/types/dashboard";
 
 export function CRMContent({ slug }: { slug: string }) {
-  const [ghlData, setGhlData] = useState<GHLData | null>(null);
-  const [systemeData, setSystemeData] = useState<SystemeData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: client } = await supabase.from("clients").select("id").eq("slug", slug).single();
-      if (!client) { setLoading(false); return; }
-      const { data: period } = await supabase.from("reporting_periods").select("id").eq("is_current", true).single();
-      if (!period) { setLoading(false); return; }
-
-      const [ghlRes, systemeRes] = await Promise.all([
-        supabase.from("dashboard_data").select("data").eq("client_id", client.id).eq("period_id", period.id).eq("section", "ghl").single(),
-        supabase.from("dashboard_data").select("data").eq("client_id", client.id).eq("period_id", period.id).eq("section", "systeme").single(),
-      ]);
-
-      if (ghlRes.data?.data) setGhlData(ghlRes.data.data as GHLData);
-      if (systemeRes.data?.data) setSystemeData(systemeRes.data.data as SystemeData);
-      setLoading(false);
-    }
-    load();
-  }, [slug]);
+  const { data: sections, loading } = useDashboardSections(slug, ["ghl", "systeme"]);
+  const ghlData = sections.ghl as GHLData | undefined || null;
+  const systemeData = sections.systeme as SystemeData | undefined || null;
 
   if (loading) return <LoadingSkeleton />;
   if (!ghlData && !systemeData) return <EmptyState message="No CRM data available for this client." />;
