@@ -62,7 +62,7 @@ export function DashboardHeader({
         <div>
           <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm mb-2 cursor-pointer backdrop-blur-sm">
             <select
-              className="bg-transparent border-none text-white font-medium text-sm focus:outline-none cursor-pointer"
+              className="bg-transparent border-none text-white font-medium text-sm focus:outline-none cursor-pointer appearance-none pr-5"
               value=""
               onChange={(e) => {
                 if (e.target.value) onClientChange(e.target.value);
@@ -77,7 +77,7 @@ export function DashboardHeader({
                 </option>
               ))}
             </select>
-            <ChevronDown size={14} />
+            <ChevronDown size={14} className="-ml-4 pointer-events-none" />
           </div>
           <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight">
             {clientName}

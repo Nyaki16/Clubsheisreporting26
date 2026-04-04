@@ -128,6 +128,46 @@ const data = {
     },
     gibs: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
   },
+
+  // Systeme.io Revenue (from CSV exports): { client: { month: { rev, sales, label, products } } }
+  systemeRev: {
+    pal: {
+      jan: { rev: 95512, sales: 117, label: "117 sales across 8 products", products: [
+        { name: "Confidence to Speak R450", count: 65, revenue: 28350 },
+        { name: "90-Day Unforgettable: Secure your Spot", count: 17, revenue: 25500 },
+        { name: "Speak to Get Promoted", count: 19, revenue: 14962 },
+        { name: "Exclusive VIP Package", count: 5, revenue: 10000 },
+        { name: "Secure Your Spot R1000 English", count: 5, revenue: 5000 },
+        { name: "Articulate to Get Hired", count: 4, revenue: 5000 },
+        { name: "3 Monthly Installments (90day)", count: 1, revenue: 3500 },
+        { name: "Core Business English Remainder", count: 1, revenue: 3200 },
+      ]},
+      feb: { rev: 132238, sales: 101, label: "101 sales across 10 products", products: [
+        { name: "Full Once-off payment Eng", count: 6, revenue: 40800 },
+        { name: "Confidence to Speak R450", count: 51, revenue: 22950 },
+        { name: "Speak to Get Promoted", count: 25, revenue: 18525 },
+        { name: "3-Month Plan English", count: 6, revenue: 14796 },
+        { name: "3 Monthly Installments (90day)", count: 3, revenue: 10500 },
+        { name: "Core Business English Remainder", count: 4, revenue: 9400 },
+        { name: "90-Day Unforgettable: Secure your Spot", count: 2, revenue: 3000 },
+        { name: "3 Months Payment Plan", count: 1, revenue: 2267 },
+        { name: "Exclusive VIP Package", count: 1, revenue: 2000 },
+        { name: "Secure Your Spot R1000 English", count: 2, revenue: 2000 },
+      ]},
+      mar: { rev: 115586, sales: 121, label: "121 sales across 10 products", products: [
+        { name: "Confidence to Speak R450", count: 64, revenue: 28800 },
+        { name: "Speak to Get Promoted", count: 32, revenue: 23988 },
+        { name: "90-Day Unforgettable: Secure your Spot", count: 13, revenue: 19500 },
+        { name: "3 Monthly Installments (90day)", count: 4, revenue: 14000 },
+        { name: "90-Day Unforgettable: General (Once-Off)", count: 1, revenue: 11200 },
+        { name: "3-Month Plan English", count: 2, revenue: 4932 },
+        { name: "Exclusive VIP Package", count: 2, revenue: 4000 },
+        { name: "2-Month Plan English", count: 1, revenue: 3700 },
+        { name: "Core Business English Remainder", count: 1, revenue: 3200 },
+        { name: "3 Months Payment Plan", count: 1, revenue: 2267 },
+      ]},
+    },
+  },
 };
 
 function buildOverview(clientKey, month, prevMonth) {
@@ -182,6 +222,17 @@ function buildOverview(clientKey, month, prevMonth) {
   // IG Reach
   if (ig) kpis.push({ label: "IG Monthly Reach", value: fmt(ig), badge: igPrev ? pct(ig, igPrev) : `▲ ${month} total`, direction: "up", icon: "instagram" });
 
+  // Systeme.io Revenue (if available)
+  const sysRev = data.systemeRev[c]?.[month];
+  if (sysRev && sysRev.rev > 0) {
+    kpis.push({ label: "Systeme.io Revenue", value: fmtR(sysRev.rev), badge: `↑ ${sysRev.label}`, direction: "up", icon: "dollar" });
+  }
+
+  // Systeme.io product breakdown
+  if (sysRev?.products) {
+    result.productBreakdown = sysRev.products;
+  }
+
   // Email Leads (Palesa only - Systeme.io total)
   if (c === "pal") kpis.push({ label: "Email Leads", value: "37,145", badge: "↑ Systeme.io total", direction: "up", icon: "mail" });
 
@@ -207,7 +258,7 @@ function buildOverview(clientKey, month, prevMonth) {
     labels: ["Jan 2026", "Feb 2026", "Mar 2026"],
     adSpend: months.map(m => data.ads[c]?.[m]?.spend || 0),
     newContacts: months.map(m => data.ps[c]?.[m]?.success || 0),
-    revenue: months.map(m => (data.ps[c]?.[m]?.rev || 0) + (data.ghl[c]?.[m]?.rev || 0)),
+    revenue: months.map(m => (data.ps[c]?.[m]?.rev || 0) + (data.ghl[c]?.[m]?.rev || 0) + (data.systemeRev[c]?.[m]?.rev || 0)),
   };
 
   // Campaign spend
