@@ -173,8 +173,8 @@ function buildOverview(clientKey, month, prevMonth) {
   result.performanceTrend = {
     labels: ["Jan 2026", "Feb 2026", "Mar 2026"],
     adSpend: months.map(m => data.ads[c]?.[m]?.spend || 0),
-    newContacts: [0, 0, 0],
-    socialReach: months.map(m => data.fb[c]?.[m]?.imp || 0),
+    newContacts: months.map(m => data.ps[c]?.[m]?.success || 0),
+    revenue: months.map(m => data.ps[c]?.[m]?.rev || 0),
   };
 
   // Campaign spend

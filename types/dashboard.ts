@@ -100,7 +100,8 @@ export interface PerformanceTrend {
   labels: string[];
   adSpend: number[];
   newContacts: number[];
-  socialReach: number[];
+  socialReach?: number[];
+  revenue?: number[];
 }
 
 export interface SocialHighlights {
