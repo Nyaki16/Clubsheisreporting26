@@ -25,6 +25,7 @@ export function TabNavigation({ slug }: { slug: string }) {
     { label: "Activity Log", href: `${base}/activity` },
     { label: "Wins & Insights", href: `${base}/insights` },
     { label: "Next Month", href: `${base}/next-month` },
+    { label: "Strategy Notes", href: `${base}/notes` },
   ];
 
   return (

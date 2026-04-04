@@ -13,11 +13,25 @@ import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { OverviewData } from "@/types/dashboard";
 
+interface EmailKpis {
+  kpis: { totalSent: number; totalDelivered: number; totalFailed: number; deliveryRate: string; campaignCount: number };
+}
+
 export function OverviewContent({ slug }: { slug: string }) {
   const { data, loading } = useDashboardData<OverviewData>(slug, "overview");
+  const { data: emailData } = useDashboardData<EmailKpis>(slug, "email");
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="No overview data available for this period." />;
+
+  // Merge email KPIs into the snapshot
+  const allKpis = [...data.kpis];
+  if (emailData?.kpis) {
+    allKpis.push(
+      { label: "Emails Sent", value: emailData.kpis.totalSent.toLocaleString(), badge: `${emailData.kpis.campaignCount} campaigns`, direction: "up" as const, icon: "mail" },
+      { label: "Email Delivery Rate", value: emailData.kpis.deliveryRate, badge: `${emailData.kpis.totalDelivered.toLocaleString()} delivered`, direction: "up" as const, icon: "check-circle" },
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -26,13 +40,13 @@ export function OverviewContent({ slug }: { slug: string }) {
         <h2 className="font-serif text-xl font-semibold text-gray-900">Monthly Snapshot</h2>
         <p className="text-sm text-gray-500 mb-4">A high-level view of performance across all channels this month.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {data.kpis.slice(0, 5).map((kpi) => (
+          {allKpis.slice(0, 5).map((kpi) => (
             <KPICard key={kpi.label} label={kpi.label} value={kpi.value} badge={kpi.badge} direction={kpi.direction} icon={kpi.icon} />
           ))}
         </div>
-        {data.kpis.length > 5 && (
+        {allKpis.length > 5 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
-            {data.kpis.slice(5).map((kpi) => (
+            {allKpis.slice(5).map((kpi) => (
               <KPICard key={kpi.label} label={kpi.label} value={kpi.value} badge={kpi.badge} direction={kpi.direction} icon={kpi.icon} />
             ))}
           </div>
