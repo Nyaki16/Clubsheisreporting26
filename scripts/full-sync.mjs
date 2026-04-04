@@ -105,6 +105,29 @@ const data = {
       plans: "~1,550 × R149/month",
     },
   },
+
+  // GHL (Ghutte) Revenue: { client: { month: { rev, txns, label } } }
+  ghl: {
+    csi: {
+      jan: { rev: 61572, txns: 32, label: "32 txns (memberships + invoices)" },
+      feb: { rev: 20028, txns: 26, label: "26 txns (memberships + invoices)" },
+      mar: { rev: 125145, txns: 34, label: "34 txns (memberships + invoices)" },
+    },
+    awa: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
+    link: {
+      jan: { rev: 199520, txns: 16, label: "16 txns (design projects + orders)" },
+      feb: { rev: 1047024, txns: 18, label: "18 txns (incl. R700K project)" },
+      mar: { rev: 808728, txns: 27, label: "27 txns (projects + orders)" },
+    },
+    pal: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
+    pur: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
+    ww: {
+      jan: { rev: 150937, txns: 0, label: "Aggregated (high volume)" },
+      feb: { rev: 45594, txns: 0, label: "Aggregated (high volume)" },
+      mar: { rev: 30396, txns: 0, label: "Aggregated (high volume)" },
+    },
+    gibs: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
+  },
 };
 
 function buildOverview(clientKey, month, prevMonth) {
@@ -117,6 +140,7 @@ function buildOverview(clientKey, month, prevMonth) {
   const adsPrev = prevMonth ? data.ads[c]?.[prevMonth] : null;
   const ps = data.ps[c]?.[month];
   const psPrev = prevMonth ? data.ps[c]?.[prevMonth] : null;
+  const ghl = data.ghl[c]?.[month];
   const igF = data.igFollowers[c];
 
   const kpis = [];
@@ -124,6 +148,11 @@ function buildOverview(clientKey, month, prevMonth) {
   // Revenue (Paystack if available)
   if (ps) {
     kpis.push({ label: "Paystack Revenue", value: fmtR(ps.rev), badge: `↑ ${ps.success} successful payments`, direction: "up", icon: "dollar" });
+  }
+
+  // Ghutte Revenue (if available)
+  if (ghl && ghl.rev > 0) {
+    kpis.push({ label: "Ghutte Revenue", value: fmtR(ghl.rev), badge: `↑ ${ghl.label}`, direction: "up", icon: "dollar" });
   }
 
   // Ad spend
@@ -174,7 +203,7 @@ function buildOverview(clientKey, month, prevMonth) {
     labels: ["Jan 2026", "Feb 2026", "Mar 2026"],
     adSpend: months.map(m => data.ads[c]?.[m]?.spend || 0),
     newContacts: months.map(m => data.ps[c]?.[m]?.success || 0),
-    revenue: months.map(m => data.ps[c]?.[m]?.rev || 0),
+    revenue: months.map(m => (data.ps[c]?.[m]?.rev || 0) + (data.ghl[c]?.[m]?.rev || 0)),
   };
 
   // Campaign spend
