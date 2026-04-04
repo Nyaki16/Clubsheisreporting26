@@ -93,19 +93,18 @@ export async function fetchFacebookOrganic(
 
   try {
     const rows = await windsorQuery(
-      "source,page_fans,impressions,engagements,account_id",
+      "source,page_fans,page_impressions,page_post_engagements,account_id",
       dateFrom,
       dateTo
     );
 
-    // Filter to facebook_organic and our page ID
-    // Windsor returns facebook_organic as source, or the data may be mixed — filter by account_id
+    // Filter to our page ID
     const filtered = rows.filter(r => String(r.account_id || "") === pageId);
     if (!filtered.length) return null;
 
     const fans = Math.max(...filtered.map(r => Number(r.page_fans) || 0));
-    const impressions = filtered.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
-    const engagements = filtered.reduce((s, r) => s + (Number(r.engagements) || 0), 0);
+    const impressions = filtered.reduce((s, r) => s + (Number(r.page_impressions) || 0), 0);
+    const engagements = filtered.reduce((s, r) => s + (Number(r.page_post_engagements) || 0), 0);
 
     return { fans, impressions, engagements };
   } catch (e) {
