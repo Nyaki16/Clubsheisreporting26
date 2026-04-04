@@ -21,7 +21,7 @@ export function PerformanceTrendChart({ data }: { data: PerformanceTrend }) {
           <XAxis dataKey="name" tick={{ fontSize: 12 }} />
           <YAxis yAxisId="left" tick={{ fontSize: 12 }} tickFormatter={(v) => `R ${v >= 1000 ? (v / 1000).toFixed(0) + "K" : v}`} />
           <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
-          <Tooltip formatter={(v: number, name: string) => [name === "contacts" ? v : `R ${Number(v).toLocaleString()}`, name === "revenue" ? "Revenue" : name === "adSpend" ? "Ad Spend" : "Contacts"]} />
+          <Tooltip formatter={(v) => `R ${Number(v).toLocaleString()}`} />
           <Legend />
           <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#059669" name="Revenue (R)" strokeWidth={2} dot={{ r: 5 }} />
           <Line yAxisId="left" type="monotone" dataKey="adSpend" stroke="#1F2937" name="Ad Spend (R)" strokeWidth={2} dot={{ r: 4 }} />
