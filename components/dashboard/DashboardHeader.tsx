@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, Calendar } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Calendar, RefreshCw } from "lucide-react";
 
 interface Props {
   clientName: string;
@@ -23,6 +24,40 @@ export function DashboardHeader({
   onClientChange,
   generatedDate,
 }: Props) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      // Parse month/year from the selected period label (e.g. "April 2026")
+      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const selected = periods.find(p => p.id === currentPeriodId);
+      const parts = selected?.label?.split(" ") || [];
+      const monthIdx = months.indexOf(parts[0]) + 1;
+      const year = parseInt(parts[1]) || new Date().getFullYear();
+      const month = monthIdx || new Date().getMonth() + 1;
+
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
+        body: JSON.stringify({ year, month }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const totalSections = data.results?.reduce((s: number, r: { sections: string[] }) => s + r.sections.length, 0) || 0;
+        setSyncResult(`Synced ${totalSections} sections`);
+        // Reload page after brief delay to show fresh data
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setSyncResult("Sync failed");
+      }
+    } catch {
+      setSyncResult("Sync error");
+    }
+    setSyncing(false);
+  }
   return (
     <header
       className="w-full text-white px-6 py-6 md:px-10 md:py-8"
@@ -50,6 +85,15 @@ export function DashboardHeader({
                 ))}
               </select>
             </div>
+            <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors disabled:opacity-50 mt-1.5"
+                title="Sync latest data from Paystack & APIs"
+              >
+                <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
+                {syncing ? "Syncing..." : syncResult || "Sync Data"}
+              </button>
             <p className="text-sm text-white/80 mt-1">{periodLabel}</p>
             <p className="text-xs text-white/60">End of Month Report</p>
             {generatedDate && (
