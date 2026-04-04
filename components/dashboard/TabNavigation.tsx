@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Settings } from "lucide-react";
 
 interface Tab {
@@ -11,6 +11,9 @@ interface Tab {
 
 export function TabNavigation({ slug }: { slug: string }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const periodParam = searchParams.get("period");
+  const qs = periodParam ? `?period=${periodParam}` : "";
   const base = `/dashboard/${slug}`;
 
   const tabs: Tab[] = [
@@ -35,7 +38,7 @@ export function TabNavigation({ slug }: { slug: string }) {
             return (
               <Link
                 key={tab.href}
-                href={tab.href}
+                href={`${tab.href}${qs}`}
                 className={`whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                   isActive
                     ? "border-[#4A1942] text-[#4A1942] font-semibold"
@@ -48,7 +51,7 @@ export function TabNavigation({ slug }: { slug: string }) {
           })}
         </nav>
         <Link
-          href={`${base}/settings`}
+          href={`${base}/settings${qs}`}
           className="p-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
         >
           <Settings size={18} />
