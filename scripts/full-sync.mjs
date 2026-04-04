@@ -149,6 +149,9 @@ function buildOverview(clientKey, month, prevMonth) {
   // IG Reach
   if (ig) kpis.push({ label: "IG Monthly Reach", value: fmt(ig), badge: igPrev ? pct(ig, igPrev) : `▲ ${month} total`, direction: "up", icon: "instagram" });
 
+  // Email Leads (Palesa only - Systeme.io total)
+  if (c === "pal") kpis.push({ label: "Email Leads", value: "37,145", badge: "↑ Systeme.io total", direction: "up", icon: "mail" });
+
   const result = { kpis };
 
   // Paystack section

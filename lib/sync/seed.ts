@@ -17,7 +17,7 @@ export async function seedDemoData() {
   // Create March 2026 period
   const { data: period } = await supabase
     .from("reporting_periods")
-    .upsert({ period_key: "2026-03", label: "March 2026", start_date: "2026-03-01", end_date: "2026-03-31", is_current: true }, { onConflict: "period_key" })
+    .upsert({ period_key: "march-2026", label: "March 2026", start_date: "2026-03-01", end_date: "2026-03-31", is_current: true }, { onConflict: "period_key" })
     .select()
     .single();
 
