@@ -47,7 +47,6 @@ const KEY_CONFIGS: KeyConfig[] = [
     label: "Systeme.io API Key",
     description: "Used to pull contacts, tags, product sales, and traffic sources from Systeme.io.",
     placeholder: "Your Systeme.io API key",
-    condition: (c) => c.has_systemeio,
   },
   {
     key: "webinarkit_api_key",
