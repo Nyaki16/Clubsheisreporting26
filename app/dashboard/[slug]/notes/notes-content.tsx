@@ -1,593 +1,382 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import {
-  FileText,
-  Plus,
-  Trash2,
-  Save,
-  Pencil,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import { useDashboardData } from "@/lib/use-dashboard-data";
+import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
+import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ActionItem {
   id: string;
   description: string;
   owner: string;
   dueDate: string;
+  priority: "high" | "medium" | "low";
   status: "pending" | "in-progress" | "done";
 }
 
 interface NotesData {
   meetingDate?: string;
-  meetingNotes: string;
+  transcript?: string;
   summary: string;
-  actionItems: ActionItem[];
-  updatedAt?: string;
+  keyDecisions?: string[];
+  meetingNotes: string;
+  agencyActions: ActionItem[];
+  clientActions: ActionItem[];
+  dataInsights?: string[];
+  generatedAt?: string;
 }
 
-const emptyData: NotesData = {
-  meetingDate: "",
-  meetingNotes: "",
-  summary: "",
-  actionItems: [],
+const statusStyles = {
+  pending: { bg: "#F3F4F6", text: "#6B7280", icon: Clock, label: "Pending" },
+  "in-progress": { bg: "#FEF3C7", text: "#D97706", icon: AlertCircle, label: "In Progress" },
+  done: { bg: "#ECFDF5", text: "#059669", icon: CheckCircle, label: "Done" },
 };
 
-function generateId() {
-  return Math.random().toString(36).substring(2, 10);
-}
+const priorityStyles = {
+  high: { bg: "#FEE2E2", text: "#DC2626" },
+  medium: { bg: "#FEF3C7", text: "#D97706" },
+  low: { bg: "#F3F4F6", text: "#6B7280" },
+};
 
-const statusConfig = {
-  pending: {
-    label: "Pending",
-    bg: "bg-gray-100",
-    text: "text-gray-700",
-    icon: AlertCircle,
-  },
-  "in-progress": {
-    label: "In Progress",
-    bg: "bg-amber-100",
-    text: "text-amber-700",
-    icon: Clock,
-  },
-  done: {
-    label: "Done",
-    bg: "bg-emerald-100",
-    text: "text-emerald-700",
-    icon: CheckCircle,
-  },
+const statusCycle: Record<string, "pending" | "in-progress" | "done"> = {
+  pending: "in-progress",
+  "in-progress": "done",
+  done: "pending",
 };
 
 export function NotesContent({ slug }: { slug: string }) {
+  const { data, loading } = useDashboardData<NotesData>(slug, "notes");
   const searchParams = useSearchParams();
   const periodParam = searchParams.get("period");
-  const [data, setData] = useState<NotesData>(emptyData);
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [periodId, setPeriodId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<NotesData>(emptyData);
-  const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [showUpload, setShowUpload] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [notes, setNotes] = useState<NotesData | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const displayNotes = notes || data;
 
+  const getIds = useCallback(async () => {
     const { data: client } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("slug", slug)
-      .single();
-    if (!client) {
-      setLoading(false);
-      return;
-    }
-    setClientId(client.id);
+      .from("clients").select("id").eq("slug", slug).single();
+    if (!client) throw new Error("Client not found");
 
-    let pid = periodParam;
-    if (!pid) {
+    let periodId = periodParam;
+    if (!periodId) {
       const { data: period } = await supabase
-        .from("reporting_periods")
-        .select("id")
-        .eq("is_current", true)
-        .single();
-      pid = period?.id || null;
+        .from("reporting_periods").select("id").eq("is_current", true).single();
+      periodId = period?.id || null;
     }
-    if (!pid) {
-      setLoading(false);
-      return;
-    }
-    setPeriodId(pid);
-
-    const { data: sectionData } = await supabase
-      .from("dashboard_data")
-      .select("data")
-      .eq("client_id", client.id)
-      .eq("period_id", pid)
-      .eq("section", "notes")
-      .single();
-
-    const saved = sectionData?.data as NotesData | undefined;
-    setData(saved || emptyData);
-    setLoading(false);
+    if (!periodId) throw new Error("No period found");
+    return { clientId: client.id, periodId };
   }, [slug, periodParam]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  function startEdit() {
-    setDraft({
-      meetingDate: data.meetingDate || "",
-      meetingNotes: data.meetingNotes || "",
-      summary: data.summary || "",
-      actionItems: data.actionItems.map((item) => ({ ...item })),
-    });
-    setEditing(true);
-  }
-
-  function addActionItem() {
-    setDraft({
-      ...draft,
-      actionItems: [
-        ...draft.actionItems,
-        {
-          id: generateId(),
-          description: "",
-          owner: "",
-          dueDate: "",
-          status: "pending",
-        },
-      ],
-    });
-  }
-
-  function removeActionItem(id: string) {
-    setDraft({
-      ...draft,
-      actionItems: draft.actionItems.filter((item) => item.id !== id),
-    });
-  }
-
-  function updateActionItem(
-    id: string,
-    field: keyof ActionItem,
-    value: string
-  ) {
-    setDraft({
-      ...draft,
-      actionItems: draft.actionItems.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      ),
-    });
-  }
-
-  async function toggleStatus(id: string) {
-    const order: ActionItem["status"][] = ["pending", "in-progress", "done"];
-    const updated = data.actionItems.map((item) => {
-      if (item.id !== id) return item;
-      const currentIdx = order.indexOf(item.status);
-      const nextStatus = order[(currentIdx + 1) % order.length];
-      return { ...item, status: nextStatus };
-    });
-
-    const updatedData = {
-      ...data,
-      actionItems: updated,
-      updatedAt: new Date().toISOString(),
-    };
-    setData(updatedData);
-
-    // Persist immediately
-    if (!periodId || !clientId) return;
-    const { data: existing } = await supabase
-      .from("dashboard_data")
-      .select("id")
-      .eq("client_id", clientId)
-      .eq("period_id", periodId)
-      .eq("section", "notes")
-      .single();
-
-    if (existing) {
-      await supabase
-        .from("dashboard_data")
-        .update({
-          data: updatedData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("client_id", clientId)
-        .eq("period_id", periodId)
-        .eq("section", "notes");
-    }
-  }
-
-  async function save() {
-    if (!periodId || !clientId) return;
-    setSaving(true);
-
-    const payload: NotesData = {
-      meetingDate: draft.meetingDate,
-      meetingNotes: draft.meetingNotes,
-      summary: draft.summary,
-      actionItems: draft.actionItems.filter(
-        (item) => item.description.trim() !== ""
-      ),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const { data: existing } = await supabase
-      .from("dashboard_data")
-      .select("id")
-      .eq("client_id", clientId)
-      .eq("period_id", periodId)
-      .eq("section", "notes")
-      .single();
-
-    if (existing) {
-      await supabase
-        .from("dashboard_data")
-        .update({ data: payload, updated_at: new Date().toISOString() })
-        .eq("client_id", clientId)
-        .eq("period_id", periodId)
-        .eq("section", "notes");
-    } else {
-      await supabase.from("dashboard_data").insert({
-        client_id: clientId,
-        period_id: periodId,
-        section: "notes",
-        data: payload,
+  async function handleProcess() {
+    if (!transcript.trim()) return;
+    setProcessing(true);
+    try {
+      const { clientId, periodId } = await getIds();
+      const res = await fetch("/api/process-transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
+        body: JSON.stringify({ clientId, periodId, transcript, meetingDate }),
       });
+      const result = await res.json();
+      if (result.success) {
+        setNotes(result.notes);
+        setShowUpload(false);
+      } else {
+        alert("Failed: " + (result.error || "Unknown error"));
+      }
+    } catch (e) {
+      alert("Error: " + String(e));
     }
-
-    setData(payload);
-    setEditing(false);
-    setSaving(false);
+    setProcessing(false);
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="h-40 bg-gray-200 rounded" />
-        <div className="h-32 bg-gray-200 rounded" />
-      </div>
-    );
+  async function toggleStatus(type: "agency" | "client", id: string) {
+    if (!displayNotes) return;
+    const key = type === "agency" ? "agencyActions" : "clientActions";
+    const updated = {
+      ...displayNotes,
+      [key]: displayNotes[key].map(item =>
+        item.id === id ? { ...item, status: statusCycle[item.status] } : item
+      ),
+    };
+    setNotes(updated);
+
+    // Persist to Supabase
+    try {
+      const { clientId, periodId } = await getIds();
+      await supabase
+        .from("dashboard_data")
+        .update({ data: updated, updated_at: new Date().toISOString() })
+        .eq("client_id", clientId)
+        .eq("period_id", periodId)
+        .eq("section", "notes");
+    } catch (e) {
+      console.error("Failed to save status:", e);
+    }
   }
 
-  const hasContent =
-    data.meetingNotes || data.summary || data.actionItems.length > 0;
-
-  // ── VIEW MODE ──
-  if (!editing) {
-    return (
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-serif text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#4A1942]" />
-              Strategy Notes
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Monthly strategy meeting notes, summaries, and action items.
-            </p>
-          </div>
-          <button
-            onClick={startEdit}
-            className="flex items-center gap-1.5 text-sm text-[#4A1942] hover:text-[#6b2d63] font-medium px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors"
-          >
-            {hasContent ? (
-              <Pencil className="w-3.5 h-3.5" />
-            ) : (
-              <Plus className="w-3.5 h-3.5" />
-            )}
-            {hasContent ? "Edit" : "Add Notes"}
-          </button>
-        </div>
-
-        {!hasContent && (
-          <p className="text-sm text-gray-400">
-            No strategy notes added for this period. Click &quot;Add
-            Notes&quot; to get started.
-          </p>
-        )}
-
-        {hasContent && (
-          <>
-            {/* Meeting Date */}
-            {data.meetingDate && (
-              <div className="text-sm text-gray-500">
-                <span className="font-medium text-gray-700">
-                  Meeting Date:
-                </span>{" "}
-                {new Date(data.meetingDate).toLocaleDateString("en-ZA", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
-            )}
-
-            {/* Meeting Notes */}
-            {data.meetingNotes && (
-              <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                  Meeting Notes
-                </h3>
-                <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {data.meetingNotes}
-                </div>
-              </div>
-            )}
-
-            {/* Summary */}
-            {data.summary && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                  Summary
-                </h3>
-                <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {data.summary}
-                </div>
-              </div>
-            )}
-
-            {/* Action Items */}
-            {data.actionItems.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">
-                  Action Items
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left pb-2 pr-4 text-gray-500 font-medium">
-                          Status
-                        </th>
-                        <th className="text-left pb-2 pr-4 text-gray-500 font-medium">
-                          Description
-                        </th>
-                        <th className="text-left pb-2 pr-4 text-gray-500 font-medium">
-                          Owner
-                        </th>
-                        <th className="text-left pb-2 text-gray-500 font-medium">
-                          Due Date
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.actionItems.map((item) => {
-                        const sc = statusConfig[item.status];
-                        const StatusIcon = sc.icon;
-                        return (
-                          <tr
-                            key={item.id}
-                            className="border-b border-gray-100 last:border-0"
-                          >
-                            <td className="py-3 pr-4">
-                              <button
-                                onClick={() => toggleStatus(item.id)}
-                                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} hover:opacity-80 transition-opacity`}
-                                title="Click to cycle status"
-                              >
-                                <StatusIcon className="w-3.5 h-3.5" />
-                                {sc.label}
-                              </button>
-                            </td>
-                            <td
-                              className={`py-3 pr-4 text-gray-800 ${item.status === "done" ? "line-through text-gray-400" : ""}`}
-                            >
-                              {item.description}
-                            </td>
-                            <td className="py-3 pr-4 text-gray-600">
-                              {item.owner}
-                            </td>
-                            <td className="py-3 text-gray-600">
-                              {item.dueDate
-                                ? new Date(item.dueDate).toLocaleDateString(
-                                    "en-ZA"
-                                  )
-                                : ""}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Updated At */}
-            {data.updatedAt && (
-              <p className="text-xs text-gray-400 text-right">
-                Last updated:{" "}
-                {new Date(data.updatedAt).toLocaleString("en-ZA")}
-              </p>
-            )}
-          </>
-        )}
-      </div>
-    );
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setTranscript(ev.target?.result as string || "");
+    };
+    reader.readAsText(file);
   }
 
-  // ── EDIT MODE ──
+  if (loading) return <LoadingSkeleton />;
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-serif text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-[#4A1942]" />
-            Strategy Notes
-          </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Editing notes for this period.
+          <h2 className="font-serif text-xl font-semibold text-gray-900">Strategy Notes</h2>
+          <p className="text-sm text-gray-500">
+            {displayNotes?.generatedAt
+              ? `Last updated ${new Date(displayNotes.generatedAt).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}`
+              : "Upload a meeting transcript to generate notes and action items."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEditing(false)}
-            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#6b2d63] px-4 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowUpload(!showUpload)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4A1942] text-white font-medium text-sm rounded-lg hover:bg-[#3a1335] transition-colors"
+        >
+          <Upload size={16} />
+          {displayNotes ? "Upload New Transcript" : "Upload Transcript"}
+        </button>
       </div>
 
-      {/* Meeting Date */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
-          Meeting Date
-        </label>
-        <input
-          type="date"
-          value={draft.meetingDate || ""}
-          onChange={(e) => setDraft({ ...draft, meetingDate: e.target.value })}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942] w-full max-w-xs"
-        />
-      </div>
-
-      {/* Meeting Notes */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
-          Meeting Notes
-        </label>
-        <textarea
-          value={draft.meetingNotes}
-          onChange={(e) =>
-            setDraft({ ...draft, meetingNotes: e.target.value })
-          }
-          rows={8}
-          placeholder="Paste or type meeting notes here..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942] resize-y"
-        />
-      </div>
-
-      {/* Summary */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
-          Summary
-        </label>
-        <textarea
-          value={draft.summary}
-          onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-          rows={4}
-          placeholder="Brief summary of key discussion points..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942] resize-y"
-        />
-      </div>
-
-      {/* Action Items */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">
-          Action Items
-        </h3>
-
-        {draft.actionItems.length === 0 && (
-          <p className="text-sm text-gray-400 mb-3">
-            No action items yet. Add one below.
-          </p>
-        )}
-
-        <div className="space-y-3">
-          {draft.actionItems.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-start gap-3 bg-gray-50 rounded-lg p-3"
-            >
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="sm:col-span-2">
-                  <input
-                    type="text"
-                    placeholder="Description"
-                    value={item.description}
-                    onChange={(e) =>
-                      updateActionItem(item.id, "description", e.target.value)
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942]"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Owner"
-                    value={item.owner}
-                    onChange={(e) =>
-                      updateActionItem(item.id, "owner", e.target.value)
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942]"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={item.dueDate}
-                    onChange={(e) =>
-                      updateActionItem(item.id, "dueDate", e.target.value)
-                    }
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942]"
-                  />
-                  <select
-                    value={item.status}
-                    onChange={(e) =>
-                      updateActionItem(item.id, "status", e.target.value)
-                    }
-                    className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 focus:border-[#4A1942]"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="done">Done</option>
-                  </select>
-                </div>
-              </div>
-              <button
-                onClick={() => removeActionItem(item.id)}
-                className="text-red-400 hover:text-red-600 p-1 mt-1"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+      {/* Upload Area */}
+      {showUpload && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Meeting Date</label>
+              <input
+                type="date"
+                value={meetingDate}
+                onChange={(e) => setMeetingDate(e.target.value)}
+                className="mt-1 block border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]"
+              />
             </div>
-          ))}
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Upload File</label>
+              <input
+                type="file"
+                accept=".txt,.md,.doc,.docx"
+                onChange={handleFileUpload}
+                className="mt-1 block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Or Paste Transcript</label>
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Paste your meeting transcript or notes here..."
+              rows={10}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942] resize-y"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowUpload(false)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">
+              Cancel
+            </button>
+            <button
+              onClick={handleProcess}
+              disabled={processing || !transcript.trim()}
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium text-sm rounded-lg hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 transition-all"
+            >
+              <Sparkles size={16} className={processing ? "animate-spin" : ""} />
+              {processing ? "Analyzing transcript..." : "Process with AI"}
+            </button>
+          </div>
+          {processing && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+              <p className="text-sm text-amber-900">Reading transcript and analyzing against dashboard data...</p>
+              <p className="text-xs text-amber-600 mt-1">This may take 20-30 seconds</p>
+            </div>
+          )}
         </div>
+      )}
 
-        <button
-          onClick={addActionItem}
-          className="flex items-center gap-1.5 text-sm text-[#4A1942] hover:text-[#6b2d63] font-medium mt-4"
-        >
-          <Plus className="w-4 h-4" /> Add action item
-        </button>
+      {/* Generated Notes */}
+      {displayNotes && (
+        <div className="space-y-6">
+          {/* Meeting Info */}
+          {displayNotes.meetingDate && (
+            <p className="text-sm text-gray-500">Meeting Date: <span className="font-medium text-gray-900">{displayNotes.meetingDate}</span></p>
+          )}
+
+          {/* Executive Summary */}
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-2">Executive Summary</h3>
+            <p className="text-sm leading-relaxed">{displayNotes.summary}</p>
+          </div>
+
+          {/* Key Decisions */}
+          {displayNotes.keyDecisions && displayNotes.keyDecisions.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-6">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Key Decisions</h3>
+              <ul className="space-y-2">
+                {displayNotes.keyDecisions.map((d, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-900">
+                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Meeting Notes */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Meeting Notes</h3>
+            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayNotes.meetingNotes}</div>
+          </div>
+
+          {/* Data Insights */}
+          {displayNotes.dataInsights && displayNotes.dataInsights.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Data Insights from Dashboard</h3>
+              <ul className="space-y-2">
+                {displayNotes.dataInsights.map((insight, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-blue-900">
+                    <Sparkles size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                    {insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Agency Action Items */}
+          <ActionItemsTable
+            title="Agency Action Items"
+            subtitle="Tasks for the Club She Is team"
+            emoji="🏢"
+            items={displayNotes.agencyActions}
+            onToggle={(id) => toggleStatus("agency", id)}
+            borderColor="#4A1942"
+          />
+
+          {/* Client Action Items */}
+          <ActionItemsTable
+            title="Client Action Items"
+            subtitle="Tasks for the client to complete"
+            emoji="👤"
+            items={displayNotes.clientActions}
+            onToggle={(id) => toggleStatus("client", id)}
+            borderColor="#059669"
+          />
+
+          {/* Show/hide transcript */}
+          {displayNotes.transcript && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowTranscript(!showTranscript)}
+                className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium text-gray-500 hover:bg-gray-50"
+              >
+                <span>Original Transcript</span>
+                {showTranscript ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+              {showTranscript && (
+                <div className="px-6 pb-4 text-xs text-gray-500 whitespace-pre-wrap max-h-96 overflow-y-auto border-t border-gray-100">
+                  {displayNotes.transcript}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!displayNotes && !showUpload && (
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Upload size={32} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm">No strategy notes for this period yet.</p>
+          <p className="text-gray-400 text-xs mt-1">Upload a meeting transcript to get AI-generated notes, action items, and data insights.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionItemsTable({
+  title, subtitle, emoji, items, onToggle, borderColor,
+}: {
+  title: string;
+  subtitle: string;
+  emoji: string;
+  items: ActionItem[];
+  onToggle: (id: string) => void;
+  borderColor: string;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200" style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}>
+        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <span>{emoji}</span> {title}
+        </h3>
+        <p className="text-xs text-gray-500">{subtitle}</p>
       </div>
-
-      {/* Bottom Save */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setEditing(false)}
-          className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#6b2d63] px-4 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
-        >
-          <Save className="w-3.5 h-3.5" />
-          {saving ? "Saving..." : "Save"}
-        </button>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Owner</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Due</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Priority</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {items.map((item) => {
+              const st = statusStyles[item.status];
+              const pr = priorityStyles[item.priority];
+              const StatusIcon = st.icon;
+              return (
+                <tr key={item.id} className={`hover:bg-gray-50 ${item.status === "done" ? "opacity-60" : ""}`}>
+                  <td className="px-6 py-3">
+                    <button
+                      onClick={() => onToggle(item.id)}
+                      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                      title={`Click to change: ${st.label}`}
+                    >
+                      <StatusIcon size={18} style={{ color: st.text }} />
+                    </button>
+                  </td>
+                  <td className={`px-4 py-3 text-gray-900 ${item.status === "done" ? "line-through" : ""}`}>
+                    {item.description}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{item.owner}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{item.dueDate}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="text-[0.6rem] font-bold uppercase px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: pr.bg, color: pr.text }}
+                    >
+                      {item.priority}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
