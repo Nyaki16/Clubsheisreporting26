@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const periodStart = new Date(period.start_date);
-    const periodEnd = new Date(period.end_date);
+    const periodEnd = new Date(period.end_date + "T23:59:59.999Z");
 
     // Call GHL API to get completed email schedules
     const ghlUrl = `https://services.leadconnectorhq.com/emails/schedule?locationId=${encodeURIComponent(ghlAccountId)}&limit=100&status=complete`;
