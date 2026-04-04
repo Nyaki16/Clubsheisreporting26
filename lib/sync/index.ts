@@ -197,54 +197,79 @@ async function fetchPaystackData(clientId: string, from: string, to: string) {
 
 async function loadPreviousPeriodData(clientId: string, periodId: string): Promise<FetchedClientData | null> {
   const supabase = getServiceClient();
-  const { data: overview } = await supabase
+
+  // Load all stored sections for this period to get actual numbers
+  const { data: rows } = await supabase
     .from("dashboard_data")
-    .select("data")
+    .select("section, data")
     .eq("client_id", clientId)
     .eq("period_id", periodId)
-    .eq("section", "overview")
-    .single();
+    .in("section", ["overview", "social", "paystack", "meta"]);
 
-  if (!overview?.data) return null;
+  if (!rows?.length) return null;
 
-  // Reconstruct a minimal FetchedClientData from stored overview data
-  const d = overview.data as Record<string, unknown>;
-  const kpis = (d.kpis as Array<{ label: string; value: string }>) || [];
-  const socialH = d.socialHighlights as Record<string, { value: string }> | undefined;
-  const ps = d.paystack as { revenue?: number } | undefined;
+  const sections: Record<string, Record<string, unknown>> = {};
+  for (const r of rows) sections[r.section] = r.data as Record<string, unknown>;
 
-  // Parse numbers from formatted strings
+  const overview = sections.overview;
+  const social = sections.social;
+  const paystackSection = sections.paystack;
+  const metaSection = sections.meta;
+
+  // Extract from social section trend data (actual numbers, not formatted strings)
+  const socialTrend = social?.trend as { instagramReach?: number[]; facebookReach?: number[]; followers?: number[] } | undefined;
+  const socialKpis = (social?.kpis as Array<{ label: string; value: string }>) || [];
+
+  // Parse a formatted number string properly
   const parseNum = (s: string) => {
     if (!s) return 0;
-    const clean = s.replace(/[R,\s]/g, "").replace("K", "000").replace("M", "000000");
+    const clean = s.replace(/[R,\s]/g, "");
+    if (clean.endsWith("M")) return parseFloat(clean.replace("M", "")) * 1000000;
+    if (clean.endsWith("K")) return parseFloat(clean.replace("K", "")) * 1000;
     return parseFloat(clean) || 0;
   };
 
-  const findKpi = (label: string) => kpis.find(k => k.label === label)?.value || "";
+  const findSocialKpi = (label: string) => socialKpis.find(k => k.label === label)?.value || "";
+
+  // Get Paystack revenue from the paystack section (actual number)
+  const psRevenue = (paystackSection?.revenue as number) || (overview?.paystack as { revenue?: number })?.revenue || 0;
+
+  // Get Meta Ads data from meta section
+  const metaKpis = (metaSection?.kpis as Array<{ label: string; value: string }>) || [];
+  const findMetaKpi = (label: string) => metaKpis.find(k => k.label === label)?.value || "";
+
+  // Get the last entry from trend arrays (most recent month)
+  const igReach = socialTrend?.instagramReach?.slice(-1)[0] || parseNum(findSocialKpi("IG Monthly Reach"));
+  const fbReach = socialTrend?.facebookReach?.slice(-1)[0] || parseNum(findSocialKpi("FB Organic Reach"));
+  const fbFans = socialTrend?.followers?.slice(-1)[0] || parseNum(findSocialKpi("Facebook Followers"));
+  const fbEng = parseNum(findSocialKpi("FB Engagements"));
 
   return {
     clientId,
     clientKey: "",
     periodLabel: "",
-    paystack: ps?.revenue ? {
-      revenue: ps.revenue as number,
+    paystack: psRevenue > 0 ? {
+      revenue: psRevenue,
       successCount: 0,
       failedCount: 0,
       abandonedCount: 0,
       reversedCount: 0,
     } : undefined,
-    metaAds: findKpi("Total Ad Spend") ? {
-      spend: parseNum(findKpi("Total Ad Spend")),
-      impressions: 0, clicks: 0, reach: 0, campaigns: [],
+    metaAds: findMetaKpi("Ad Spend") ? {
+      spend: parseNum(findMetaKpi("Ad Spend")),
+      impressions: parseNum(findMetaKpi("Impressions")),
+      clicks: parseNum(findMetaKpi("Clicks")),
+      reach: parseNum(findMetaKpi("Reach")),
+      campaigns: [],
     } : undefined,
-    fbOrganic: socialH ? {
-      fans: parseNum(socialH.facebookFans?.value || "0"),
-      impressions: parseNum(socialH.fbOrganicReach?.value || "0"),
-      engagements: parseNum(socialH.fbEngagements?.value || "0"),
+    fbOrganic: (fbFans > 0 || fbReach > 0) ? {
+      fans: fbFans,
+      impressions: fbReach,
+      engagements: fbEng,
     } : undefined,
-    instagram: socialH ? {
-      reach: parseNum(socialH.igMonthlyReach?.value || "0"),
-      followers: socialH.instagramFollowers?.value || "N/A",
+    instagram: igReach > 0 ? {
+      reach: igReach,
+      followers: findSocialKpi("Instagram Followers") || "N/A",
     } : undefined,
   };
 }
