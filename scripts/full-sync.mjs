@@ -122,9 +122,9 @@ const data = {
     pal: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
     pur: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
     ww: {
-      jan: { rev: 150937, txns: 0, label: "Aggregated (high volume)" },
-      feb: { rev: 45594, txns: 0, label: "Aggregated (high volume)" },
-      mar: { rev: 30396, txns: 0, label: "Aggregated (high volume)" },
+      jan: { rev: 150937, txns: 1013, label: "1,013 new subscribers × R149", isNewSubs: true },
+      feb: { rev: 45594, txns: 306, label: "306 new subscribers × R149", isNewSubs: true },
+      mar: { rev: 30396, txns: 204, label: "204 new subscribers × R149", isNewSubs: true },
     },
     gibs: { jan: { rev: 0, txns: 0, label: "" }, feb: { rev: 0, txns: 0, label: "" }, mar: { rev: 0, txns: 0, label: "" } },
   },
@@ -150,9 +150,13 @@ function buildOverview(clientKey, month, prevMonth) {
     kpis.push({ label: "Paystack Revenue", value: fmtR(ps.rev), badge: `↑ ${ps.success} successful payments`, direction: "up", icon: "dollar" });
   }
 
-  // Ghutte Revenue (if available)
+  // Ghutte Revenue or New Subscribers
   if (ghl && ghl.rev > 0) {
-    kpis.push({ label: "Ghutte Revenue", value: fmtR(ghl.rev), badge: `↑ ${ghl.label}`, direction: "up", icon: "dollar" });
+    if (ghl.isNewSubs) {
+      kpis.push({ label: "New Subscribers", value: fmt(ghl.txns), badge: `↑ ${ghl.label}`, direction: "up", icon: "user-plus" });
+    } else {
+      kpis.push({ label: "Ghutte Revenue", value: fmtR(ghl.rev), badge: `↑ ${ghl.label}`, direction: "up", icon: "dollar" });
+    }
   }
 
   // Ad spend
