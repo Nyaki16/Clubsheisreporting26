@@ -24,19 +24,24 @@ export async function POST(request: NextRequest) {
     const supabase = getServiceClient();
 
     // Get GHL API key and account ID from dashboard_data (api_keys section, period_id=null)
-    const { data: keyRow } = await supabase
+    const { data: keyRows } = await supabase
       .from("dashboard_data")
       .select("data")
       .eq("client_id", clientId)
       .eq("section", "api_keys")
       .is("period_id", null)
-      .single();
+      .limit(5);
 
-    if (!keyRow?.data) {
-      return Response.json({ error: "No API keys configured for this client" }, { status: 400 });
+    // Merge all api_keys rows (some clients have duplicates)
+    const keys: Record<string, string> = {};
+    for (const row of keyRows || []) {
+      const d = row.data as Record<string, string>;
+      if (d) Object.assign(keys, d);
     }
 
-    const keys = keyRow.data as Record<string, string>;
+    if (!Object.keys(keys).length) {
+      return Response.json({ error: "No API keys configured for this client" }, { status: 400 });
+    }
     const ghlPitKey = keys.ghl_pit_key;
     const ghlAccountId = keys.ghl_account_id;
 
