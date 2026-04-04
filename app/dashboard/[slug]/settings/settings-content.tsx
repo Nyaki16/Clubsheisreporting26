@@ -12,6 +12,7 @@ interface ClientInfo {
   has_meta_ads: boolean;
   has_ghl: boolean;
   has_systemeio: boolean;
+  has_webinarkit: boolean;
   paystack_account: string | null;
   ghl_account: string | null;
   windsor_facebook_account: string | null;
@@ -95,7 +96,7 @@ export function SettingsContent({ slug }: { slug: string }) {
   const loadData = useCallback(async () => {
     const { data: clientData } = await supabase
       .from("clients")
-      .select("id, name, slug, has_paystack, has_meta_ads, has_ghl, has_systemeio, paystack_account, ghl_account, windsor_facebook_account, windsor_instagram_account")
+      .select("id, name, slug, has_paystack, has_meta_ads, has_ghl, has_systemeio, has_webinarkit, paystack_account, ghl_account, windsor_facebook_account, windsor_instagram_account")
       .eq("slug", slug)
       .single();
 
