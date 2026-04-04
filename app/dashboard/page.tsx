@@ -1,10 +1,15 @@
 import Link from "next/link";
-import { getClients } from "@/lib/data";
+import { getServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const clients = await getClients();
+  const supabase = getServiceClient();
+  const { data: clients = [] } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("is_active", true)
+    .order("name");
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAF7F2" }}>
