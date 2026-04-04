@@ -29,7 +29,7 @@ export function OverviewContent({ slug }: { slug: string }) {
           ))}
         </div>
         {data.kpis.length > 5 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
             {data.kpis.slice(5).map((kpi) => (
               <KPICard key={kpi.label} label={kpi.label} value={kpi.value} badge={kpi.badge} direction={kpi.direction} icon={kpi.icon} />
             ))}
@@ -43,7 +43,7 @@ export function OverviewContent({ slug }: { slug: string }) {
           <h2 className="font-serif text-xl font-semibold text-gray-900 flex items-center gap-2">
             <span>💳</span> Paystack Payments
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
             <KPICard label="Paystack Revenue" value={data.paystack.revenueFormatted} badge={data.paystack.revenueBadge} direction="up" />
             {data.paystack.activeMemberships !== undefined && (
               <KPICard label="Active Memberships" value={String(data.paystack.activeMemberships)} badge={data.paystack.membershipBreakdown} direction="up" />
@@ -109,7 +109,7 @@ export function OverviewContent({ slug }: { slug: string }) {
             <KPICardTinted tint="green" label="FB Engagements" value={data.socialHighlights.fbEngagements.value} badge={data.socialHighlights.fbEngagements.badge} />
             <KPICardTinted tint="green" label="IG Monthly Reach" value={data.socialHighlights.igMonthlyReach.value} badge={data.socialHighlights.igMonthlyReach.badge} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
             <KPICardTinted tint="green" label="Engagement Rate" value={data.socialHighlights.engagementRate.value} badge={data.socialHighlights.engagementRate.badge} />
           </div>
         </div>

@@ -162,6 +162,7 @@ export async function seedDemoData() {
       { label: "Instagram Followers", value: "19,224", badge: "↑ Current", direction: "up", icon: "instagram" },
       { label: "Organic Reach", value: "1.86M", badge: "↑ Facebook", direction: "up", icon: "globe" },
       { label: "FB Engagements", value: "39,509", badge: "↑ Post engagements", direction: "up", icon: "check-circle" },
+      { label: "Email Leads", value: "37,145", badge: "↑ Systeme.io total", direction: "up", icon: "mail" },
     ],
     paystack: {
       revenue: 116036, revenueFormatted: "R 116,036", revenueBadge: "↑ 122 transactions in March",

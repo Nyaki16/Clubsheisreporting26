@@ -35,7 +35,7 @@ export function CRMContent({ slug }: { slug: string }) {
               ))}
             </div>
             {ghlData.kpis.length > 5 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
                 {ghlData.kpis.slice(5).map((kpi) => (
                   <KPICard key={kpi.label} label={kpi.label} value={kpi.value} badge={kpi.badge} direction={kpi.direction} />
                 ))}
@@ -71,7 +71,7 @@ export function CRMContent({ slug }: { slug: string }) {
             <h2 className="font-serif text-xl font-semibold text-gray-900 flex items-center gap-2">
               <span>📊</span> Systeme.io
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
               {systemeData.kpis.map((kpi) => (
                 <KPICardTinted key={kpi.label} tint="green" label={kpi.label} value={kpi.value} badge={kpi.badge} />
               ))}
