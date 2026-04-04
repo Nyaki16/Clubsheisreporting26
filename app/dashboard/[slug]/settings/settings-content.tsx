@@ -30,9 +30,16 @@ interface KeyConfig {
 const KEY_CONFIGS: KeyConfig[] = [
   {
     key: "paystack_secret_key",
-    label: "Paystack Secret Key",
-    description: "Used to pull subscription counts, transaction breakdowns, and revenue data directly from Paystack.",
+    label: "Paystack Secret Key (Primary)",
+    description: "Primary Paystack account — used to pull subscription counts, transaction breakdowns, and revenue data.",
     placeholder: "sk_live_...",
+    condition: (c) => c.has_paystack,
+  },
+  {
+    key: "paystack_secret_key_2",
+    label: "Paystack Secret Key (Secondary)",
+    description: "Secondary Paystack account — if this client has a second Paystack account. Leave blank if not applicable.",
+    placeholder: "sk_live_... (optional)",
     condition: (c) => c.has_paystack,
   },
   {
