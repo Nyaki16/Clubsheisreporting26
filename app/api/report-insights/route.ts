@@ -72,12 +72,39 @@ export async function POST(request: NextRequest) {
       for (const s of prevSections || []) prevSectionMap[s.section] = s.data;
     }
 
+    // Fetch strategy notes from current + past 3 periods for context
+    const pastNotes: { period: string; summary?: string; notes?: string; agencyActions?: unknown[]; clientActions?: unknown[] }[] = [];
+    for (const p of allPeriods || []) {
+      const { data: notesRow } = await supabase
+        .from("dashboard_data")
+        .select("data")
+        .eq("client_id", clientId)
+        .eq("period_id", p.id)
+        .eq("section", "notes")
+        .single();
+      if (notesRow?.data) {
+        const n = notesRow.data as Record<string, unknown>;
+        pastNotes.push({
+          period: p.label,
+          summary: n.summary as string,
+          notes: (n.meetingNotes as string)?.slice(0, 1500),
+          agencyActions: n.agencyActions as unknown[],
+          clientActions: n.clientActions as unknown[],
+        });
+      }
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return Response.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
     }
 
     const anthropic = new Anthropic({ apiKey });
+
+    // Build meeting notes context
+    const meetingContext = pastNotes.length > 0
+      ? `\n\nMEETING NOTES & STRATEGY SESSIONS:\n${JSON.stringify(pastNotes, null, 2).slice(0, 3000)}`
+      : "";
 
     const dataContext = JSON.stringify({
       client: client?.name,
@@ -97,10 +124,13 @@ export async function POST(request: NextRequest) {
 
 Analyze the data and provide specific, data-driven insights for EACH section. Reference actual numbers. Compare to industry benchmarks. Be direct and actionable — this goes to the client.
 
+IMPORTANT: If meeting notes or strategy session transcripts are provided, reference decisions made, action items discussed, and how the data reflects progress on those commitments. Connect the data to the conversations that were had.
+
 ${SA_BENCHMARKS}
 
 CLIENT DATA:
-${dataContext.slice(0, 6000)}
+${dataContext.slice(0, 8000)}
+${meetingContext}
 
 Respond in this exact JSON format:
 {
