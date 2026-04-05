@@ -88,10 +88,11 @@ export function DashboardHeader({
                 ))}
               </select>
             </div>
-            <button
+            <div className="flex items-center gap-3 mt-2">
+              <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors disabled:opacity-50 mt-1.5"
+                className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors disabled:opacity-50"
                 title="Sync latest data from Paystack & APIs"
               >
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
@@ -100,13 +101,14 @@ export function DashboardHeader({
               {slug && (
                 <Link
                   href={`/dashboard/${slug}/report${currentPeriodId ? `?period=${currentPeriodId}` : ""}`}
-                  className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors"
+                  className="inline-flex items-center gap-1.5 bg-white text-[#4A1942] font-semibold rounded-lg px-4 py-1.5 text-xs hover:bg-white/90 transition-colors shadow-sm"
                   title="Generate PDF report for this client"
                 >
                   <FileText size={12} />
                   Generate Report
                 </Link>
               )}
+            </div>
             <p className="text-sm text-white/80 mt-1">{periodLabel}</p>
             <p className="text-xs text-white/60">End of Month Report</p>
             {generatedDate && (
