@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Download, ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface ClientInfo { name: string; id: string }
 interface PeriodInfo { label: string; id: string }
@@ -93,6 +94,8 @@ export function ReportContent({ slug }: { slug: string }) {
   const insights = sections.insights as { wins?: Array<{ text: string }>; alerts?: Array<{ text: string }> } | undefined;
   const strategy = sections.strategy as { summary?: string; revenueOpportunities?: Array<{ title: string; insight: string; action: string; impact: string }>; adOptimization?: Array<{ title: string; insight: string; action: string; impact: string }>; growthPlays?: Array<{ title: string; insight: string; action: string; impact: string }> } | undefined;
   const notes = sections.notes as { summary?: string; agencyActions?: Array<{ description: string; owner: string; status: string }>; clientActions?: Array<{ description: string; owner: string; status: string }> } | undefined;
+  const performanceTrend = overview.performanceTrend as { labels?: string[]; adSpend?: number[]; newContacts?: number[]; revenue?: number[] } | undefined;
+  const socialTrend = (sections.social as { trend?: { labels?: string[]; instagramReach?: number[]; facebookReach?: number[] } } | undefined)?.trend;
 
   return (
     <>
@@ -190,6 +193,61 @@ export function ReportContent({ slug }: { slug: string }) {
               </div>
             ))}
           </div>
+
+          {/* Performance Trend Chart */}
+          {performanceTrend?.labels && performanceTrend.labels.length > 0 && (
+            <div className="mb-10 border border-gray-200 rounded-lg p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Performance Trend — All Channels</h3>
+              <p className="text-xs text-gray-500 mb-4">Monthly revenue, ad spend, and contacts across all sources.</p>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={performanceTrend.labels.map((label, i) => ({
+                  name: label,
+                  revenue: performanceTrend.revenue?.[i] || 0,
+                  adSpend: performanceTrend.adSpend?.[i] || 0,
+                  contacts: performanceTrend.newContacts?.[i] || 0,
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `R ${v >= 1000 ? (v / 1000).toFixed(0) + "K" : v}`} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  <Tooltip formatter={(v: any, name: any) => String(name) === "Contacts" ? Number(v).toLocaleString() : `R ${Number(v).toLocaleString()}`} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#059669" name="Revenue (R)" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line yAxisId="left" type="monotone" dataKey="adSpend" stroke="#1F2937" name="Ad Spend (R)" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="contacts" stroke="#D97706" name="Contacts" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Social Reach Trend */}
+          {socialTrend?.labels && socialTrend.labels.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 mb-10">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-xs font-semibold text-gray-900 mb-3">Instagram Reach Trend</h3>
+                <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={socialTrend.labels.map((label, i) => ({ name: label, reach: socialTrend.instagramReach?.[i] || 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 8 }} />
+                    <YAxis tick={{ fontSize: 8 }} tickFormatter={(v: number) => v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v)} />
+                    <Line type="monotone" dataKey="reach" stroke="#8B3A62" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-xs font-semibold text-gray-900 mb-3">Facebook Reach Trend</h3>
+                <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={socialTrend.labels.map((label, i) => ({ name: label, reach: socialTrend.facebookReach?.[i] || 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 8 }} />
+                    <YAxis tick={{ fontSize: 8 }} tickFormatter={(v: number) => v >= 1000 ? (v / 1000).toFixed(0) + "K" : String(v)} />
+                    <Line type="monotone" dataKey="reach" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           {/* Paystack Summary */}
           {paystack && (
