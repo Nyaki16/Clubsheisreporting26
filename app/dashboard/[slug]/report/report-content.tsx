@@ -117,6 +117,7 @@ export function ReportContent({ slug }: { slug: string }) {
             <Download size={16} /> Export PDF
           </button>
         </div>
+        <p className="text-[0.65rem] text-gray-400 mt-1">Tip: In the print dialog, enable &quot;Background graphics&quot; to keep the cover page colours.</p>
       </div>
 
       {/* Transcript suggestion */}
@@ -171,7 +172,7 @@ export function ReportContent({ slug }: { slug: string }) {
         </div>
 
         {/* Page 2: Executive Summary + KPIs */}
-        <div className="p-16 print:p-12 min-h-[297mm] print:break-before-page">
+        <div className="p-16 print:p-12 print:break-before-page">
           <SectionHeader title="Monthly Snapshot" />
 
           {/* Overview Insight */}
@@ -232,7 +233,7 @@ export function ReportContent({ slug }: { slug: string }) {
 
         {/* Page 3: Meta Ads */}
         {meta?.kpis && (
-          <div className="p-16 print:p-12 min-h-[297mm] print:break-before-page">
+          <div className="p-16 print:p-12 print:break-before-page">
             <SectionHeader title="Meta Ads Performance" />
             <div className="grid grid-cols-3 gap-4 mb-8">
               {meta.kpis.map((kpi, i) => (
@@ -321,7 +322,7 @@ export function ReportContent({ slug }: { slug: string }) {
         )}
 
         {/* Page 4: Insights & Strategy */}
-        <div className="p-16 print:p-12 min-h-[297mm] print:break-before-page">
+        <div className="p-16 print:p-12 print:break-before-page">
           {/* Wins & Alerts */}
           {insights && (
             <>
@@ -447,12 +448,18 @@ export function ReportContent({ slug }: { slug: string }) {
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
-          body { margin: 0; padding: 0; }
+          body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .print\\:hidden { display: none !important; }
           .print\\:break-before-page { break-before: page; }
           .print\\:p-12 { padding: 3rem !important; }
           .print\\:max-w-none { max-width: none !important; }
           @page { size: A4; margin: 0; }
+          .grid { break-inside: avoid; }
+          table { break-inside: avoid; }
+          .rounded-lg, .rounded-xl { break-inside: avoid; }
+          h2, h3 { break-after: avoid; }
+          .mb-6, .mb-10 { break-inside: avoid; }
         }
       `}</style>
     </>
