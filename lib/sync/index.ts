@@ -36,6 +36,13 @@ const MEMBERSHIP_AMOUNTS: Record<string, number[]> = {
 // Clients where GHL revenue represents new subscribers
 const GHL_NEW_SUBS_CLIENTS = ["eb1d354f-d57f-4730-9cfb-6f057b83ee08"]; // W&W
 
+// Periods with verified data from full-sync.mjs — auto-sync must NOT overwrite these
+const LOCKED_PERIODS = [
+  "january-2026",
+  "february-2026",
+  "march-2026",
+];
+
 export async function runMonthlySync(year: number, month: number): Promise<SyncResult[]> {
   const supabase = getServiceClient();
   const results: SyncResult[] = [];
@@ -65,6 +72,15 @@ export async function runMonthlySync(year: number, month: number): Promise<SyncR
   }
 
   if (!period) throw new Error("Failed to create period");
+
+  // Check if this period has verified/locked data
+  if (LOCKED_PERIODS.includes(periodKey)) {
+    return [{
+      client: "ALL",
+      sections: [],
+      errors: [`Period ${periodLabel} is locked (verified data from full-sync). Auto-sync skipped to protect data accuracy. To update this period, run full-sync.mjs manually.`],
+    }];
+  }
 
   // 2. Ensure all clients exist in DB
   for (const client of CLIENT_ACCOUNTS) {
