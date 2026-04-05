@@ -52,6 +52,7 @@ export function DashboardShell({ slug, children }: Props) {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FAF7F2" }}>
       <DashboardHeader
         clientName={clientName || slug}
+        slug={slug}
         periodLabel={periodLabel}
         periods={periods}
         clients={clients}

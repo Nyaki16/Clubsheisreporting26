@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Calendar, RefreshCw } from "lucide-react";
+import { ChevronDown, Calendar, RefreshCw, FileText } from "lucide-react";
+import Link from "next/link";
 
 interface Props {
   clientName: string;
+  slug?: string;
   periodLabel: string;
   periods: { id: string; label: string }[];
   clients: { slug: string; name: string }[];
@@ -16,6 +18,7 @@ interface Props {
 
 export function DashboardHeader({
   clientName,
+  slug,
   periodLabel,
   periods,
   clients,
@@ -94,6 +97,16 @@ export function DashboardHeader({
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
                 {syncing ? "Syncing..." : syncResult || "Sync Data"}
               </button>
+              {slug && (
+                <Link
+                  href={`/dashboard/${slug}/report${currentPeriodId ? `?period=${currentPeriodId}` : ""}`}
+                  className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors"
+                  title="Generate PDF report for this client"
+                >
+                  <FileText size={12} />
+                  Generate Report
+                </Link>
+              )}
             <p className="text-sm text-white/80 mt-1">{periodLabel}</p>
             <p className="text-xs text-white/60">End of Month Report</p>
             {generatedDate && (

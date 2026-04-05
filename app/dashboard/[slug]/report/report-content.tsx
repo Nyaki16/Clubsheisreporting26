@@ -83,6 +83,7 @@ export function ReportContent({ slug }: { slug: string }) {
 
   if (loading) return <div className="p-10 text-center text-gray-400">Loading report...</div>;
 
+  const hasNotes = !!sections.notes;
   const overview = sections.overview || {};
   const kpis = (overview.kpis as Array<{ label: string; value: string; badge?: string }>) || [];
   const paystack = overview.paystack as { revenueFormatted?: string; revenueBadge?: string; failedFormatted?: string; abandonedFormatted?: string; activeMemberships?: number; membershipBreakdown?: string } | undefined;
@@ -117,6 +118,37 @@ export function ReportContent({ slug }: { slug: string }) {
           </button>
         </div>
       </div>
+
+      {/* Transcript suggestion */}
+      {!hasNotes && (
+        <div className="print:hidden max-w-[210mm] mx-auto mt-4 mb-2">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-4 flex items-start gap-3">
+            <Sparkles size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">Want richer insights?</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Upload your strategy meeting transcript on the{" "}
+                <Link href={`/dashboard/${slug}/notes`} className="underline font-medium hover:text-amber-900">Strategy Notes</Link>{" "}
+                tab first. The AI will reference what was discussed, track action items, and connect your data to decisions made in meetings.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasNotes && !reportInsights && (
+        <div className="print:hidden max-w-[210mm] mx-auto mt-4 mb-2">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-5 py-4 flex items-start gap-3">
+            <Sparkles size={20} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-emerald-900">Strategy notes detected</p>
+              <p className="text-xs text-emerald-700 mt-1">
+                Meeting notes are available for this period. Click <strong>Generate Insights</strong> to create a report that references your strategy discussions, action items, and data performance.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report */}
       <div ref={reportRef} className="max-w-[210mm] mx-auto bg-white print:max-w-none">
