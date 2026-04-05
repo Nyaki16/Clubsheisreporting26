@@ -3,11 +3,22 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Download, ArrowLeft } from "lucide-react";
+import { Download, ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 interface ClientInfo { name: string; id: string }
 interface PeriodInfo { label: string; id: string }
+interface SectionInsight { headline?: string; insights?: string[]; recommendation?: string }
+interface ReportInsights {
+  overview?: SectionInsight;
+  revenue?: SectionInsight;
+  metaAds?: SectionInsight;
+  social?: SectionInsight;
+  email?: SectionInsight;
+  churn?: SectionInsight;
+  nextMonth?: { topPriority?: string; quickWins?: string[]; bigBets?: string[] };
+  generatedAt?: string;
+}
 
 export function ReportContent({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
@@ -17,6 +28,8 @@ export function ReportContent({ slug }: { slug: string }) {
   const [period, setPeriod] = useState<PeriodInfo | null>(null);
   const [sections, setSections] = useState<Record<string, Record<string, unknown>>>({});
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [reportInsights, setReportInsights] = useState<ReportInsights | null>(null);
 
   const loadData = useCallback(async () => {
     const { data: c } = await supabase.from("clients").select("id, name").eq("slug", slug).single();
@@ -42,10 +55,27 @@ export function ReportContent({ slug }: { slug: string }) {
     const s: Record<string, Record<string, unknown>> = {};
     for (const r of rows || []) s[r.section] = r.data as Record<string, unknown>;
     setSections(s);
+    if (s.reportInsights) setReportInsights(s.reportInsights as unknown as ReportInsights);
     setLoading(false);
   }, [slug, periodParam]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleGenerateInsights() {
+    if (!client || !period) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/report-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
+        body: JSON.stringify({ clientId: client.id, periodId: period.id }),
+      });
+      const result = await res.json();
+      if (result.success) setReportInsights(result.insights);
+      else alert("Failed: " + result.error);
+    } catch (e) { alert("Error: " + String(e)); }
+    setGenerating(false);
+  }
 
   function handlePrint() {
     window.print();
@@ -70,12 +100,22 @@ export function ReportContent({ slug }: { slug: string }) {
         <Link href={`/dashboard/${slug}`} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft size={16} /> Back to Dashboard
         </Link>
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-4 py-2 bg-[#4A1942] text-white font-medium text-sm rounded-lg hover:bg-[#3a1335]"
-        >
-          <Download size={16} /> Export PDF
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGenerateInsights}
+            disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium text-sm rounded-lg hover:from-amber-600 hover:to-orange-600 disabled:opacity-50"
+          >
+            <Sparkles size={16} className={generating ? "animate-spin" : ""} />
+            {generating ? "Generating..." : reportInsights ? "Regenerate Insights" : "Generate Insights"}
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-4 py-2 bg-[#4A1942] text-white font-medium text-sm rounded-lg hover:bg-[#3a1335]"
+          >
+            <Download size={16} /> Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Report */}
@@ -102,6 +142,11 @@ export function ReportContent({ slug }: { slug: string }) {
         <div className="p-16 print:p-12 min-h-[297mm] print:break-before-page">
           <SectionHeader title="Monthly Snapshot" />
 
+          {/* Overview Insight */}
+          {reportInsights?.overview && (
+            <InsightBlock headline={reportInsights.overview.headline} insights={reportInsights.overview.insights} />
+          )}
+
           {/* KPI Grid */}
           <div className="grid grid-cols-3 gap-4 mb-10">
             {kpis.map((kpi, i) => (
@@ -125,6 +170,12 @@ export function ReportContent({ slug }: { slug: string }) {
                 <StatBox label="Failed" value={paystack.failedFormatted || "—"} sub="Recovery opportunity" negative />
                 <StatBox label="Abandoned" value={paystack.abandonedFormatted || "—"} sub="Incomplete checkouts" negative />
               </div>
+              {reportInsights?.revenue && (
+                <InsightBlock headline={reportInsights.revenue.headline} insights={reportInsights.revenue.insights} recommendation={reportInsights.revenue.recommendation} />
+              )}
+              {reportInsights?.churn && (
+                <InsightBlock headline={reportInsights.churn.headline} insights={reportInsights.churn.insights} recommendation={reportInsights.churn.recommendation} />
+              )}
             </>
           )}
 
@@ -140,6 +191,9 @@ export function ReportContent({ slug }: { slug: string }) {
                 <StatBox label="IG Monthly Reach" value={socialH.igMonthlyReach?.value || "—"} />
                 <StatBox label="Engagement Rate" value={socialH.engagementRate?.value || "—"} />
               </div>
+              {reportInsights?.social && (
+                <InsightBlock headline={reportInsights.social.headline} insights={reportInsights.social.insights} recommendation={reportInsights.social.recommendation} />
+              )}
             </>
           )}
         </div>
@@ -160,6 +214,9 @@ export function ReportContent({ slug }: { slug: string }) {
 
             {meta.campaigns && meta.campaigns.length > 0 && (
               <>
+                {reportInsights?.metaAds && (
+                  <InsightBlock headline={reportInsights.metaAds.headline} insights={reportInsights.metaAds.insights} recommendation={reportInsights.metaAds.recommendation} />
+                )}
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Campaign Breakdown</h3>
                 <table className="w-full text-xs border-collapse mb-10">
                   <thead>
@@ -192,6 +249,9 @@ export function ReportContent({ slug }: { slug: string }) {
             {email?.kpis && (
               <>
                 <SectionHeader title="Email Marketing" />
+                {reportInsights?.email && (
+                  <InsightBlock headline={reportInsights.email.headline} insights={reportInsights.email.insights} recommendation={reportInsights.email.recommendation} />
+                )}
                 <div className="grid grid-cols-4 gap-4 mb-8">
                   <StatBox label="Emails Sent" value={email.kpis.totalSent.toLocaleString()} sub={`${email.kpis.campaignCount} campaigns`} />
                   <StatBox label="Delivered" value={email.kpis.totalDelivered.toLocaleString()} />
@@ -279,6 +339,39 @@ export function ReportContent({ slug }: { slug: string }) {
           )}
 
           {/* Action Items */}
+          {/* Next Month Priorities */}
+          {reportInsights?.nextMonth && (
+            <>
+              <SectionHeader title="Next Month Priorities" />
+              <div className="bg-[#4A1942] rounded-lg p-5 mb-6 text-white">
+                <p className="text-xs uppercase tracking-wider text-white/60 mb-1">Top Priority</p>
+                <p className="text-sm font-medium">{reportInsights.nextMonth.topPriority}</p>
+              </div>
+              {reportInsights.nextMonth.quickWins && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-2">Quick Wins</h3>
+                  {reportInsights.nextMonth.quickWins.map((w, i) => (
+                    <div key={i} className="flex items-start gap-2 mb-2">
+                      <span className="text-emerald-500 mt-0.5">→</span>
+                      <p className="text-sm text-gray-700">{w}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {reportInsights.nextMonth.bigBets && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-[#4A1942] uppercase tracking-wider mb-2">Big Bets</h3>
+                  {reportInsights.nextMonth.bigBets.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2 mb-2">
+                      <span className="text-[#4A1942] mt-0.5">★</span>
+                      <p className="text-sm text-gray-700">{b}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           {notes && (notes.agencyActions?.length || notes.clientActions?.length) ? (
             <>
               <SectionHeader title="Action Items" />
@@ -349,6 +442,23 @@ function StatBox({ label, value, sub, negative }: { label: string; value: string
       <p className="text-[0.6rem] uppercase tracking-wider text-gray-400 font-medium">{label}</p>
       <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
       {sub && <p className={`text-xs mt-1 ${negative ? "text-red-500" : "text-emerald-600"}`}>{sub}</p>}
+    </div>
+  );
+}
+
+function InsightBlock({ headline, insights, recommendation }: { headline?: string; insights?: string[]; recommendation?: string }) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      {headline && <p className="text-sm font-semibold text-amber-900 mb-2">{headline}</p>}
+      {insights && insights.map((insight, i) => (
+        <div key={i} className="flex items-start gap-2 mb-1">
+          <span className="text-amber-500 text-xs mt-0.5">●</span>
+          <p className="text-xs text-amber-900">{insight}</p>
+        </div>
+      ))}
+      {recommendation && (
+        <p className="text-xs font-medium text-amber-800 mt-2 pt-2 border-t border-amber-200">→ {recommendation}</p>
+      )}
     </div>
   );
 }
