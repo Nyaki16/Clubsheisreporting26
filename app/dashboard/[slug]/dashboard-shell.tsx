@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TabNavigation } from "@/components/dashboard/TabNavigation";
@@ -15,6 +15,7 @@ interface Props {
 export function DashboardShell({ slug, children }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [clientName, setClientName] = useState("");
   const [periodLabel, setPeriodLabel] = useState("");
   const [currentPeriodId, setCurrentPeriodId] = useState("");
@@ -61,8 +62,8 @@ export function DashboardShell({ slug, children }: Props) {
           setCurrentPeriodId(id);
           const p = periods.find((pp) => pp.id === id);
           if (p) setPeriodLabel(p.label);
-          // Update URL so content components refetch
-          router.push(`/dashboard/${slug}?period=${id}`);
+          // Stay on current tab when changing period
+          router.push(`${pathname}?period=${id}`);
         }}
         onClientChange={(newSlug) => router.push(`/dashboard/${newSlug}`)}
       />
