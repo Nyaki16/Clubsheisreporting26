@@ -27,6 +27,7 @@ export function NewClientContent() {
   const [hasGhl, setHasGhl] = useState(false);
   const [hasSystemeio, setHasSystemeio] = useState(false);
   const [hasWebinarkit, setHasWebinarkit] = useState(false);
+  const [hasTiktokAds, setHasTiktokAds] = useState(false);
 
   // Social Media toggles
   const [hasFacebook, setHasFacebook] = useState(false);
@@ -111,6 +112,7 @@ export function NewClientContent() {
           has_ghl: hasGhl,
           has_systemeio: hasSystemeio,
           has_webinarkit: hasWebinarkit,
+          has_tiktok_ads: hasTiktokAds,
           has_facebook: hasFacebook,
           has_instagram: hasInstagram,
           has_tiktok: hasTiktok,
@@ -238,6 +240,7 @@ export function NewClientContent() {
                 { label: "GoHighLevel (Ghutte)", value: hasGhl, setter: setHasGhl, desc: "CRM contacts & revenue" },
                 { label: "Systeme.io", value: hasSystemeio, setter: setHasSystemeio, desc: "Funnels & contacts" },
                 { label: "WebinarKit", value: hasWebinarkit, setter: setHasWebinarkit, desc: "Webinar registrations" },
+                { label: "TikTok Ads", value: hasTiktokAds, setter: setHasTiktokAds, desc: "TikTok paid advertising" },
               ].map((toggle) => (
                 <label
                   key={toggle.label}
