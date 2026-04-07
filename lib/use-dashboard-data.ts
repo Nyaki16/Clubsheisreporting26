@@ -20,7 +20,18 @@ export function useDashboardData<T>(slug: string, section: string) {
       if (!client) { setLoading(false); return; }
 
       // Use period from URL or fall back to is_current
-      let periodId = periodParam;
+      let periodId: string | null = null;
+      if (periodParam) {
+        // periodParam could be a UUID or a period_key like "march-2026"
+        const isUuid = /^[0-9a-f]{8}-/.test(periodParam);
+        if (isUuid) {
+          periodId = periodParam;
+        } else {
+          const { data: period } = await supabase
+            .from("reporting_periods").select("id").eq("period_key", periodParam).single();
+          periodId = period?.id || null;
+        }
+      }
       if (!periodId) {
         const { data: period } = await supabase
           .from("reporting_periods").select("id").eq("is_current", true).single();
@@ -61,7 +72,17 @@ export function useDashboardSections(slug: string, sections: string[]) {
         .from("clients").select("id").eq("slug", slug).single();
       if (!client) { setLoading(false); return; }
 
-      let periodId = periodParam;
+      let periodId: string | null = null;
+      if (periodParam) {
+        const isUuid = /^[0-9a-f]{8}-/.test(periodParam);
+        if (isUuid) {
+          periodId = periodParam;
+        } else {
+          const { data: period } = await supabase
+            .from("reporting_periods").select("id").eq("period_key", periodParam).single();
+          periodId = period?.id || null;
+        }
+      }
       if (!periodId) {
         const { data: period } = await supabase
           .from("reporting_periods").select("id").eq("is_current", true).single();
