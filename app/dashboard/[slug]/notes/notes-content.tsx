@@ -545,7 +545,7 @@ export function NotesContent({ slug }: { slug: string }) {
                       />
                       <button onClick={() => setEditMeetingNotes(editMeetingNotes.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
-                    {section.points.map((point, j) => (
+                    {(section.points || []).map((point, j) => (
                       <div key={j} className="flex items-center gap-2 ml-4">
                         <span className="text-gray-400">•</span>
                         <input
@@ -563,25 +563,36 @@ export function NotesContent({ slug }: { slug: string }) {
               </div>
             ) : Array.isArray(displayNotes.meetingNotes) ? (
               <div className="space-y-5">
-                {displayNotes.meetingNotes.map((section, i) => (
-                  <div key={i}>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4A1942]" />
-                      {section.topic}
-                    </h4>
-                    <ul className="space-y-1.5 ml-4">
-                      {section.points.map((point, j) => (
-                        <li key={j} className="text-sm text-gray-700 leading-relaxed flex items-start gap-2">
-                          <span className="text-gray-400 mt-1.5 flex-shrink-0">•</span>
-                          <span>{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {displayNotes.meetingNotes.map((section, i) => {
+                  // Handle both formats: string[] (old) and {topic, points}[] (new)
+                  if (typeof section === "string") {
+                    const isBold = section.startsWith("**") || section.startsWith("•");
+                    if (!section.trim()) return null;
+                    if (section.startsWith("**")) {
+                      return <h4 key={i} className="text-sm font-semibold text-gray-900 mt-3 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#4A1942]" />{section.replace(/\*\*/g, "")}</h4>;
+                    }
+                    return <p key={i} className="text-sm text-gray-700 ml-4 flex items-start gap-2">{isBold ? "" : <span className="text-gray-400 mt-0.5 flex-shrink-0">•</span>}<span>{section.replace(/^•\s*/, "")}</span></p>;
+                  }
+                  return (
+                    <div key={i}>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#4A1942]" />
+                        {section.topic}
+                      </h4>
+                      <ul className="space-y-1.5 ml-4">
+                        {(section.points || []).map((point, j) => (
+                          <li key={j} className="text-sm text-gray-700 leading-relaxed flex items-start gap-2">
+                            <span className="text-gray-400 mt-1.5 flex-shrink-0">•</span>
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayNotes.meetingNotes}</div>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{String(displayNotes.meetingNotes)}</div>
             )}
           </div>
 
