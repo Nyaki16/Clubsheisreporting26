@@ -28,6 +28,13 @@ export function NewClientContent() {
   const [hasSystemeio, setHasSystemeio] = useState(false);
   const [hasWebinarkit, setHasWebinarkit] = useState(false);
 
+  // Social Media toggles
+  const [hasFacebook, setHasFacebook] = useState(false);
+  const [hasInstagram, setHasInstagram] = useState(false);
+  const [hasTiktok, setHasTiktok] = useState(false);
+  const [hasYoutube, setHasYoutube] = useState(false);
+  const [hasLinkedin, setHasLinkedin] = useState(false);
+
   // Account IDs
   const [paystackAccount, setPaystackAccount] = useState("");
   const [ghlAccount, setGhlAccount] = useState("");
@@ -43,6 +50,11 @@ export function NewClientContent() {
   const [metaAdsAccountId, setMetaAdsAccountId] = useState("");
   const [facebookPageId, setFacebookPageId] = useState("");
   const [instagramAccountId, setInstagramAccountId] = useState("");
+
+  // Social Media URLs/IDs
+  const [tiktokUsername, setTiktokUsername] = useState("");
+  const [youtubeChannelId, setYoutubeChannelId] = useState("");
+  const [linkedinPageUrl, setLinkedinPageUrl] = useState("");
 
   // Membership
   const [membershipAmounts, setMembershipAmounts] = useState("");
@@ -83,6 +95,9 @@ export function NewClientContent() {
       if (metaAdsAccountId) apiKeys.meta_ads_account_id = metaAdsAccountId;
       if (facebookPageId) apiKeys.facebook_page_id = facebookPageId;
       if (instagramAccountId) apiKeys.instagram_account_id = instagramAccountId;
+      if (tiktokUsername) apiKeys.tiktok_username = tiktokUsername;
+      if (youtubeChannelId) apiKeys.youtube_channel_id = youtubeChannelId;
+      if (linkedinPageUrl) apiKeys.linkedin_page_url = linkedinPageUrl;
 
       const res = await fetch("/api/clients", {
         method: "POST",
@@ -96,6 +111,11 @@ export function NewClientContent() {
           has_ghl: hasGhl,
           has_systemeio: hasSystemeio,
           has_webinarkit: hasWebinarkit,
+          has_facebook: hasFacebook,
+          has_instagram: hasInstagram,
+          has_tiktok: hasTiktok,
+          has_youtube: hasYoutube,
+          has_linkedin: hasLinkedin,
           paystack_account: paystackAccount || null,
           ghl_account: ghlAccount || null,
           windsor_facebook_account: windsorFacebookAccount || null,
@@ -120,7 +140,7 @@ export function NewClientContent() {
     }
   }
 
-  const anyServiceEnabled = hasPaystack || hasMetaAds || hasGhl || hasSystemeio || hasWebinarkit;
+  const anyServiceEnabled = hasPaystack || hasMetaAds || hasGhl || hasSystemeio || hasWebinarkit || hasFacebook || hasInstagram || hasTiktok || hasYoutube || hasLinkedin;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAF7F2" }}>
@@ -210,6 +230,7 @@ export function NewClientContent() {
               Enable the platforms this client uses. This controls which dashboard tabs and sync jobs are active.
             </p>
 
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Revenue & Marketing</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { label: "Paystack", value: hasPaystack, setter: setHasPaystack, desc: "Subscriptions & revenue" },
@@ -217,6 +238,37 @@ export function NewClientContent() {
                 { label: "GoHighLevel (Ghutte)", value: hasGhl, setter: setHasGhl, desc: "CRM contacts & revenue" },
                 { label: "Systeme.io", value: hasSystemeio, setter: setHasSystemeio, desc: "Funnels & contacts" },
                 { label: "WebinarKit", value: hasWebinarkit, setter: setHasWebinarkit, desc: "Webinar registrations" },
+              ].map((toggle) => (
+                <label
+                  key={toggle.label}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    toggle.value
+                      ? "border-[#4A1942]/30 bg-[#4A1942]/5"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={toggle.value}
+                    onChange={(e) => toggle.setter(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#4A1942] focus:ring-[#4A1942]"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">{toggle.label}</span>
+                    <p className="text-xs text-gray-500">{toggle.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">Social Media</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { label: "Facebook", value: hasFacebook, setter: setHasFacebook, desc: "Page reach, followers & engagement" },
+                { label: "Instagram", value: hasInstagram, setter: setHasInstagram, desc: "Followers, reach & engagement" },
+                { label: "TikTok", value: hasTiktok, setter: setHasTiktok, desc: "Followers, views & engagement" },
+                { label: "YouTube", value: hasYoutube, setter: setHasYoutube, desc: "Subscribers, views & watch time" },
+                { label: "LinkedIn", value: hasLinkedin, setter: setHasLinkedin, desc: "Page followers & engagement" },
               ].map((toggle) => (
                 <label
                   key={toggle.label}
@@ -443,6 +495,62 @@ export function NewClientContent() {
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A1942]/20 focus:border-[#4A1942]"
                 />
               </div>
+
+              {/* Social Media Accounts */}
+              {(hasTiktok || hasYoutube || hasLinkedin) && (
+                <>
+                  <hr className="border-gray-200" />
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Social Media Accounts</p>
+
+                  {hasTiktok && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-1">
+                        TikTok Username
+                      </label>
+                      <p className="text-xs text-gray-500 mb-2">Username without @ for TikTok analytics</p>
+                      <input
+                        type="text"
+                        value={tiktokUsername}
+                        onChange={(e) => setTiktokUsername(e.target.value)}
+                        placeholder="e.g. clubsheis"
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A1942]/20 focus:border-[#4A1942]"
+                      />
+                    </div>
+                  )}
+
+                  {hasYoutube && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-1">
+                        YouTube Channel ID
+                      </label>
+                      <p className="text-xs text-gray-500 mb-2">Channel ID or handle for subscriber and view tracking</p>
+                      <input
+                        type="text"
+                        value={youtubeChannelId}
+                        onChange={(e) => setYoutubeChannelId(e.target.value)}
+                        placeholder="e.g. UCxxxxxxxx or @channelname"
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A1942]/20 focus:border-[#4A1942]"
+                      />
+                    </div>
+                  )}
+
+                  {hasLinkedin && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-1">
+                        LinkedIn Page URL
+                      </label>
+                      <p className="text-xs text-gray-500 mb-2">Company page URL for follower and engagement tracking</p>
+                      <input
+                        type="text"
+                        value={linkedinPageUrl}
+                        onChange={(e) => setLinkedinPageUrl(e.target.value)}
+                        placeholder="e.g. https://linkedin.com/company/clubsheis"
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A1942]/20 focus:border-[#4A1942]"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </section>
           )}
 
