@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
-import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, ExternalLink, Pencil, Save, X, Plus, Trash2 } from "lucide-react";
 
 interface ActionItem {
   id: string;
@@ -64,6 +64,15 @@ export function NotesContent({ slug }: { slug: string }) {
   const [clickupPushing, setClickupPushing] = useState(false);
   const [clickupPushed, setClickupPushed] = useState(false);
   const [clickupResult, setClickupResult] = useState<{ created: number; total: number } | null>(null);
+
+  // Editing state
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editSummary, setEditSummary] = useState("");
+  const [editDecisions, setEditDecisions] = useState<string[]>([]);
+  const [editMeetingNotes, setEditMeetingNotes] = useState<NoteSection[]>([]);
+  const [editDataInsights, setEditDataInsights] = useState<string[]>([]);
+  const [editAgencyActions, setEditAgencyActions] = useState<ActionItem[]>([]);
+  const [editClientActions, setEditClientActions] = useState<ActionItem[]>([]);
 
   const displayNotes = notes || data;
 
@@ -159,14 +168,14 @@ export function NotesContent({ slug }: { slug: string }) {
   async function pushToClickUp() {
     if (!displayNotes || clickupPushing || clickupPushed) return;
     const allActions = [
-      ...displayNotes.agencyActions.map((a) => ({
+      ...(displayNotes.agencyActions || []).map((a) => ({
         description: a.description,
         owner: a.owner,
         due: a.dueDate,
         priority: a.priority,
         type: "agency" as const,
       })),
-      ...displayNotes.clientActions.map((a) => ({
+      ...(displayNotes.clientActions || []).map((a) => ({
         description: a.description,
         owner: a.owner,
         due: a.dueDate,
@@ -195,6 +204,98 @@ export function NotesContent({ slug }: { slug: string }) {
       alert("Error pushing to ClickUp: " + String(e));
     }
     setClickupPushing(false);
+  }
+
+  function startEdit(section: string) {
+    if (!displayNotes) return;
+    setEditingSection(section);
+    switch (section) {
+      case "summary":
+        setEditSummary(displayNotes.summary);
+        break;
+      case "decisions":
+        setEditDecisions([...(displayNotes.keyDecisions || [])]);
+        break;
+      case "meetingNotes":
+        setEditMeetingNotes(
+          Array.isArray(displayNotes.meetingNotes)
+            ? displayNotes.meetingNotes.map(s => ({ ...s, points: [...s.points] }))
+            : [{ topic: "Notes", points: [String(displayNotes.meetingNotes)] }]
+        );
+        break;
+      case "dataInsights":
+        setEditDataInsights([...(displayNotes.dataInsights || [])]);
+        break;
+      case "agencyActions":
+        setEditAgencyActions(displayNotes.agencyActions.map(a => ({ ...a })));
+        break;
+      case "clientActions":
+        setEditClientActions(displayNotes.clientActions.map(a => ({ ...a })));
+        break;
+    }
+  }
+
+  async function saveEdit(section: string) {
+    if (!displayNotes) return;
+    let updated = { ...displayNotes };
+    switch (section) {
+      case "summary":
+        updated = { ...updated, summary: editSummary };
+        break;
+      case "decisions":
+        updated = { ...updated, keyDecisions: editDecisions.filter(d => d.trim()) };
+        break;
+      case "meetingNotes":
+        updated = { ...updated, meetingNotes: editMeetingNotes };
+        break;
+      case "dataInsights":
+        updated = { ...updated, dataInsights: editDataInsights.filter(d => d.trim()) };
+        break;
+      case "agencyActions":
+        updated = { ...updated, agencyActions: editAgencyActions };
+        break;
+      case "clientActions":
+        updated = { ...updated, clientActions: editClientActions };
+        break;
+    }
+    setNotes(updated);
+    setEditingSection(null);
+
+    try {
+      const { clientId, periodId } = await getIds();
+      await supabase
+        .from("dashboard_data")
+        .update({ data: updated, updated_at: new Date().toISOString() })
+        .eq("client_id", clientId)
+        .eq("period_id", periodId)
+        .eq("section", "notes");
+    } catch (e) {
+      console.error("Failed to save edit:", e);
+    }
+  }
+
+  function cancelEdit() {
+    setEditingSection(null);
+  }
+
+  function EditButton({ section }: { section: string }) {
+    if (editingSection === section) {
+      return (
+        <div className="flex items-center gap-1">
+          <button onClick={() => saveEdit(section)} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors" title="Save">
+            <Save size={14} />
+          </button>
+          <button onClick={cancelEdit} className="p-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors" title="Cancel">
+            <X size={14} />
+          </button>
+        </div>
+      );
+    }
+    return (
+      <button onClick={() => startEdit(section)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+        <Pencil size={14} />
+      </button>
+    );
   }
 
   if (loading) return <LoadingSkeleton />;
@@ -285,29 +386,92 @@ export function NotesContent({ slug }: { slug: string }) {
 
           {/* Executive Summary */}
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl p-6">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-2">Executive Summary</h3>
-            <p className="text-sm leading-relaxed">{displayNotes.summary}</p>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Executive Summary</h3>
+              <EditButton section="summary" />
+            </div>
+            {editingSection === "summary" ? (
+              <textarea
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                rows={4}
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y"
+              />
+            ) : (
+              <p className="text-sm leading-relaxed">{displayNotes.summary}</p>
+            )}
           </div>
 
           {/* Key Decisions */}
-          {displayNotes.keyDecisions && displayNotes.keyDecisions.length > 0 && (
+          {(displayNotes.keyDecisions && displayNotes.keyDecisions.length > 0) || editingSection === "decisions" ? (
             <div className="bg-white border border-gray-200 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Key Decisions</h3>
-              <ul className="space-y-2">
-                {displayNotes.keyDecisions.map((d, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-900">
-                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                    {d}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Key Decisions</h3>
+                <EditButton section="decisions" />
+              </div>
+              {editingSection === "decisions" ? (
+                <div className="space-y-2">
+                  {editDecisions.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={d}
+                        onChange={(e) => { const u = [...editDecisions]; u[i] = e.target.value; setEditDecisions(u); }}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]"
+                      />
+                      <button onClick={() => setEditDecisions(editDecisions.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                  <button onClick={() => setEditDecisions([...editDecisions, ""])} className="flex items-center gap-1 text-xs text-[#4A1942] hover:underline"><Plus size={12} /> Add decision</button>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {displayNotes.keyDecisions?.map((d, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-900">
+                      <CheckCircle size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* Meeting Notes */}
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Meeting Notes</h3>
-            {Array.isArray(displayNotes.meetingNotes) ? (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Meeting Notes</h3>
+              <EditButton section="meetingNotes" />
+            </div>
+            {editingSection === "meetingNotes" ? (
+              <div className="space-y-4">
+                {editMeetingNotes.map((section, i) => (
+                  <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={section.topic}
+                        onChange={(e) => { const u = [...editMeetingNotes]; u[i] = { ...u[i], topic: e.target.value }; setEditMeetingNotes(u); }}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#4A1942]"
+                        placeholder="Section topic"
+                      />
+                      <button onClick={() => setEditMeetingNotes(editMeetingNotes.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                    </div>
+                    {section.points.map((point, j) => (
+                      <div key={j} className="flex items-center gap-2 ml-4">
+                        <span className="text-gray-400">•</span>
+                        <input
+                          value={point}
+                          onChange={(e) => { const u = [...editMeetingNotes]; u[i] = { ...u[i], points: [...u[i].points] }; u[i].points[j] = e.target.value; setEditMeetingNotes(u); }}
+                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A1942]"
+                        />
+                        <button onClick={() => { const u = [...editMeetingNotes]; u[i] = { ...u[i], points: u[i].points.filter((_, k) => k !== j) }; setEditMeetingNotes(u); }} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                      </div>
+                    ))}
+                    <button onClick={() => { const u = [...editMeetingNotes]; u[i] = { ...u[i], points: [...u[i].points, ""] }; setEditMeetingNotes(u); }} className="ml-4 flex items-center gap-1 text-xs text-[#4A1942] hover:underline"><Plus size={12} /> Add point</button>
+                  </div>
+                ))}
+                <button onClick={() => setEditMeetingNotes([...editMeetingNotes, { topic: "", points: [""] }])} className="flex items-center gap-1 text-xs text-[#4A1942] hover:underline"><Plus size={12} /> Add section</button>
+              </div>
+            ) : Array.isArray(displayNotes.meetingNotes) ? (
               <div className="space-y-5">
                 {displayNotes.meetingNotes.map((section, i) => (
                   <div key={i}>
@@ -332,42 +496,99 @@ export function NotesContent({ slug }: { slug: string }) {
           </div>
 
           {/* Data Insights */}
-          {displayNotes.dataInsights && displayNotes.dataInsights.length > 0 && (
+          {(displayNotes.dataInsights && displayNotes.dataInsights.length > 0) || editingSection === "dataInsights" ? (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Data Insights from Dashboard</h3>
-              <ul className="space-y-2">
-                {displayNotes.dataInsights.map((insight, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-blue-900">
-                    <Sparkles size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                    {insight}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider">Data Insights from Dashboard</h3>
+                <EditButton section="dataInsights" />
+              </div>
+              {editingSection === "dataInsights" ? (
+                <div className="space-y-2">
+                  {editDataInsights.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={d}
+                        onChange={(e) => { const u = [...editDataInsights]; u[i] = e.target.value; setEditDataInsights(u); }}
+                        className="flex-1 border border-blue-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                      <button onClick={() => setEditDataInsights(editDataInsights.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                  <button onClick={() => setEditDataInsights([...editDataInsights, ""])} className="flex items-center gap-1 text-xs text-blue-700 hover:underline"><Plus size={12} /> Add insight</button>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {displayNotes.dataInsights?.map((insight, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-blue-900">
+                      <Sparkles size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                      {insight}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* Agency Action Items */}
-          <ActionItemsTable
-            title="Agency Action Items"
-            subtitle="Tasks for the Club She Is team"
-            emoji="🏢"
-            items={displayNotes.agencyActions}
-            onToggle={(id) => toggleStatus("agency", id)}
-            borderColor="#4A1942"
-          />
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span />
+              <EditButton section="agencyActions" />
+            </div>
+            {editingSection === "agencyActions" ? (
+              <EditableActionItems
+                title="Agency Action Items"
+                subtitle="Tasks for the Club She Is team"
+                emoji="🏢"
+                items={editAgencyActions}
+                setItems={setEditAgencyActions}
+                borderColor="#4A1942"
+                onSave={() => saveEdit("agencyActions")}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <ActionItemsTable
+                title="Agency Action Items"
+                subtitle="Tasks for the Club She Is team"
+                emoji="🏢"
+                items={displayNotes.agencyActions || []}
+                onToggle={(id) => toggleStatus("agency", id)}
+                borderColor="#4A1942"
+              />
+            )}
+          </div>
 
           {/* Client Action Items */}
-          <ActionItemsTable
-            title="Client Action Items"
-            subtitle="Tasks for the client to complete"
-            emoji="👤"
-            items={displayNotes.clientActions}
-            onToggle={(id) => toggleStatus("client", id)}
-            borderColor="#059669"
-          />
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span />
+              <EditButton section="clientActions" />
+            </div>
+            {editingSection === "clientActions" ? (
+              <EditableActionItems
+                title="Client Action Items"
+                subtitle="Tasks for the client to complete"
+                emoji="👤"
+                items={editClientActions}
+                setItems={setEditClientActions}
+                borderColor="#059669"
+                onSave={() => saveEdit("clientActions")}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <ActionItemsTable
+                title="Client Action Items"
+                subtitle="Tasks for the client to complete"
+                emoji="👤"
+                items={displayNotes.clientActions || []}
+                onToggle={(id) => toggleStatus("client", id)}
+                borderColor="#059669"
+              />
+            )}
+          </div>
 
           {/* Push to ClickUp */}
-          {(displayNotes.agencyActions.length > 0 || displayNotes.clientActions.length > 0) && (
+          {((displayNotes.agencyActions?.length || 0) > 0 || (displayNotes.clientActions?.length || 0) > 0) && (
             <div className="flex items-center gap-4">
               <button
                 onClick={pushToClickUp}
@@ -431,6 +652,97 @@ export function NotesContent({ slug }: { slug: string }) {
           <p className="text-gray-400 text-xs mt-1">Upload a meeting transcript to get AI-generated notes, action items, and data insights.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function EditableActionItems({
+  title, subtitle, emoji, items, setItems, borderColor, onSave, onCancel,
+}: {
+  title: string;
+  subtitle: string;
+  emoji: string;
+  items: ActionItem[];
+  setItems: (items: ActionItem[]) => void;
+  borderColor: string;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  function addItem() {
+    setItems([...items, {
+      id: `new-${Date.now()}`,
+      description: "",
+      owner: "",
+      dueDate: "",
+      priority: "medium",
+      status: "pending",
+    }]);
+  }
+
+  function updateItem(index: number, field: keyof ActionItem, value: string) {
+    const updated = items.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    );
+    setItems(updated);
+  }
+
+  function removeItem(index: number) {
+    setItems(items.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200" style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}>
+        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <span>{emoji}</span> {title}
+        </h3>
+        <p className="text-xs text-gray-500">{subtitle}</p>
+      </div>
+      <div className="p-4 space-y-3">
+        {items.map((item, i) => (
+          <div key={item.id} className="flex items-start gap-2 border border-gray-100 rounded-lg p-3">
+            <div className="flex-1 space-y-2">
+              <input
+                value={item.description}
+                onChange={(e) => updateItem(i, "description", e.target.value)}
+                placeholder="Task description"
+                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#4A1942]"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={item.owner}
+                  onChange={(e) => updateItem(i, "owner", e.target.value)}
+                  placeholder="Owner"
+                  className="w-32 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#4A1942]"
+                />
+                <input
+                  value={item.dueDate}
+                  onChange={(e) => updateItem(i, "dueDate", e.target.value)}
+                  placeholder="Due date"
+                  className="w-28 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#4A1942]"
+                />
+                <select
+                  value={item.priority}
+                  onChange={(e) => updateItem(i, "priority", e.target.value)}
+                  className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#4A1942]"
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 mt-1"><Trash2 size={14} /></button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between pt-2">
+          <button onClick={addItem} className="flex items-center gap-1 text-xs text-[#4A1942] hover:underline"><Plus size={12} /> Add task</button>
+          <div className="flex items-center gap-2">
+            <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5">Cancel</button>
+            <button onClick={onSave} className="flex items-center gap-1 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700"><Save size={12} /> Save</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
