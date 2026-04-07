@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
-import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 interface ActionItem {
   id: string;
@@ -61,6 +61,9 @@ export function NotesContent({ slug }: { slug: string }) {
   const [showUpload, setShowUpload] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [notes, setNotes] = useState<NotesData | null>(null);
+  const [clickupPushing, setClickupPushing] = useState(false);
+  const [clickupPushed, setClickupPushed] = useState(false);
+  const [clickupResult, setClickupResult] = useState<{ created: number; total: number } | null>(null);
 
   const displayNotes = notes || data;
 
@@ -151,6 +154,47 @@ export function NotesContent({ slug }: { slug: string }) {
       setTranscript(ev.target?.result as string || "");
     };
     reader.readAsText(file);
+  }
+
+  async function pushToClickUp() {
+    if (!displayNotes || clickupPushing || clickupPushed) return;
+    const allActions = [
+      ...displayNotes.agencyActions.map((a) => ({
+        description: a.description,
+        owner: a.owner,
+        due: a.dueDate,
+        priority: a.priority,
+        type: "agency" as const,
+      })),
+      ...displayNotes.clientActions.map((a) => ({
+        description: a.description,
+        owner: a.owner,
+        due: a.dueDate,
+        priority: a.priority,
+        type: "client" as const,
+      })),
+    ];
+    if (allActions.length === 0) return;
+
+    setClickupPushing(true);
+    try {
+      const res = await fetch("/api/clickup-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientSlug: slug, actions: allActions }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert("Failed to push to ClickUp: " + (result.error || "Unknown error"));
+        setClickupPushing(false);
+        return;
+      }
+      setClickupResult({ created: result.created, total: result.total });
+      setClickupPushed(true);
+    } catch (e) {
+      alert("Error pushing to ClickUp: " + String(e));
+    }
+    setClickupPushing(false);
   }
 
   if (loading) return <LoadingSkeleton />;
@@ -321,6 +365,43 @@ export function NotesContent({ slug }: { slug: string }) {
             onToggle={(id) => toggleStatus("client", id)}
             borderColor="#059669"
           />
+
+          {/* Push to ClickUp */}
+          {(displayNotes.agencyActions.length > 0 || displayNotes.clientActions.length > 0) && (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={pushToClickUp}
+                disabled={clickupPushing || clickupPushed}
+                className={`flex items-center gap-2 px-5 py-2.5 font-medium text-sm rounded-lg transition-all ${
+                  clickupPushed
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                    : "bg-[#7B68EE] text-white hover:bg-[#6A5ACD] disabled:opacity-50"
+                }`}
+              >
+                {clickupPushed ? (
+                  <>
+                    <CheckCircle size={16} />
+                    Pushed to ClickUp ✓
+                  </>
+                ) : clickupPushing ? (
+                  <>
+                    <ExternalLink size={16} className="animate-pulse" />
+                    Creating tasks...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink size={16} />
+                    Push to ClickUp
+                  </>
+                )}
+              </button>
+              {clickupResult && (
+                <span className="text-sm text-emerald-600">
+                  {clickupResult.created} of {clickupResult.total} tasks created
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Show/hide transcript */}
           {displayNotes.transcript && (
