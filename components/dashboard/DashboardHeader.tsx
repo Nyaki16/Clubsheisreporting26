@@ -71,7 +71,7 @@ export function DashboardHeader({
       <div className="max-w-7xl mx-auto">
         {/* Top row: logo + period */}
         <div className="flex items-start justify-between mb-6">
-          <p className="font-serif text-xl font-bold tracking-tight">Club She Is.</p>
+          <Link href="/dashboard" className="font-serif text-xl font-bold tracking-tight hover:opacity-80 transition-opacity cursor-pointer">Club She Is.</Link>
           <div className="text-right">
             <div className="inline-flex items-center gap-2 bg-white/15 rounded-lg px-3 py-1.5 text-sm backdrop-blur-sm">
               <Calendar size={14} />

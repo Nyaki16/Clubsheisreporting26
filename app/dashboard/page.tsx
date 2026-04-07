@@ -46,6 +46,28 @@ export default async function AdminDashboardPage() {
               <p className="text-sm text-gray-500">/{client.slug}</p>
             </Link>
           ))}
+          <Link
+            href="/dashboard/new"
+            className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-[#8B3A62] hover:bg-[#4A1942]/5 transition-all group flex flex-col items-center justify-center text-center min-h-[100px]"
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors group-hover:bg-[#4A1942]/10"
+              style={{ backgroundColor: "#FAF7F2" }}
+            >
+              <svg
+                className="w-5 h-5 text-gray-400 group-hover:text-[#4A1942] transition-colors"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h2 className="font-serif text-lg font-semibold text-gray-400 group-hover:text-[#4A1942] transition-colors">
+              Add New Client
+            </h2>
+          </Link>
           {clients.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-400">
               No clients found. Run a data sync to populate.
