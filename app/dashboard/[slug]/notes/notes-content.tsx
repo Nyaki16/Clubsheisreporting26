@@ -45,6 +45,16 @@ const priorityStyles = {
   low: { bg: "#F3F4F6", text: "#6B7280" },
 };
 
+const CLICKUP_LIST_URLS: Record<string, string> = {
+  "club-she-is": "https://app.clickup.com/90121487936/v/li/901216333346",
+  "palesa-dooms": "https://app.clickup.com/90121487936/v/li/901216332808",
+  "wisdom-and-wellness": "https://app.clickup.com/90121487936/v/li/901216193017",
+  "purpose-for-impact": "https://app.clickup.com/90121487936/v/li/901216190500",
+  "link-interiors": "https://app.clickup.com/90121487936/v/li/901216189889",
+  "awahome": "https://app.clickup.com/90121487936/v/li/901216094961",
+  "gibs-eda": "https://app.clickup.com/90121487936/v/li/901216237109",
+};
+
 const statusCycle: Record<string, "pending" | "in-progress" | "done"> = {
   pending: "in-progress",
   "in-progress": "done",
@@ -589,7 +599,7 @@ export function NotesContent({ slug }: { slug: string }) {
 
           {/* Push to ClickUp */}
           {((displayNotes.agencyActions?.length || 0) > 0 || (displayNotes.clientActions?.length || 0) > 0) && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <button
                 onClick={pushToClickUp}
                 disabled={clickupPushing || clickupPushed}
@@ -616,6 +626,15 @@ export function NotesContent({ slug }: { slug: string }) {
                   </>
                 )}
               </button>
+              <a
+                href={CLICKUP_LIST_URLS[slug] || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-5 py-2.5 font-medium text-sm rounded-lg border border-[#7B68EE] text-[#7B68EE] hover:bg-[#7B68EE]/5 transition-all"
+              >
+                <ExternalLink size={16} />
+                Open in ClickUp
+              </a>
               {clickupResult && (
                 <span className="text-sm text-emerald-600">
                   {clickupResult.created} of {clickupResult.total} tasks created
