@@ -79,11 +79,23 @@ export function NotesContent({ slug }: { slug: string }) {
     setProcessing(true);
     try {
       const { clientId, periodId } = await getIds();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
       const res = await fetch("/api/process-transcript", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
         body: JSON.stringify({ clientId, periodId, transcript, meetingDate }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const errBody = await res.text();
+        let errMsg = `Server error (${res.status})`;
+        try { const parsed = JSON.parse(errBody); errMsg = parsed.error || errMsg; } catch { /* use default */ }
+        alert("Failed to process transcript: " + errMsg);
+        setProcessing(false);
+        return;
+      }
       const result = await res.json();
       if (result.success) {
         setNotes(result.notes);
@@ -92,7 +104,11 @@ export function NotesContent({ slug }: { slug: string }) {
         alert("Failed: " + (result.error || "Unknown error"));
       }
     } catch (e) {
-      alert("Error: " + String(e));
+      if (e instanceof DOMException && e.name === "AbortError") {
+        alert("Request timed out. The transcript may be too long — try shortening it and retrying.");
+      } else {
+        alert("Error processing transcript: " + String(e));
+      }
     }
     setProcessing(false);
   }

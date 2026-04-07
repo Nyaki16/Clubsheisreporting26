@@ -66,15 +66,33 @@ export function ReportContent({ slug }: { slug: string }) {
     if (!client || !period) return;
     setGenerating(true);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
       const res = await fetch("/api/report-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
         body: JSON.stringify({ clientId: client.id, periodId: period.id }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const errBody = await res.text();
+        let errMsg = `Server error (${res.status})`;
+        try { const parsed = JSON.parse(errBody); errMsg = parsed.error || errMsg; } catch { /* use default */ }
+        alert("Failed to generate insights: " + errMsg);
+        setGenerating(false);
+        return;
+      }
       const result = await res.json();
       if (result.success) setReportInsights(result.insights);
       else alert("Failed: " + result.error);
-    } catch (e) { alert("Error: " + String(e)); }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        alert("Request timed out. The transcript may be too long — try shortening it and regenerating.");
+      } else {
+        alert("Error generating insights: " + String(e));
+      }
+    }
     setGenerating(false);
   }
 
@@ -111,7 +129,7 @@ export function ReportContent({ slug }: { slug: string }) {
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium text-sm rounded-lg hover:from-amber-600 hover:to-orange-600 disabled:opacity-50"
           >
             <Sparkles size={16} className={generating ? "animate-spin" : ""} />
-            {generating ? "Generating..." : reportInsights ? "Regenerate Insights" : "Generate Insights"}
+            {generating ? "Generating insights... this may take up to 60 seconds" : reportInsights ? "Regenerate Insights" : "Generate Insights"}
           </button>
           <button
             onClick={handlePrint}

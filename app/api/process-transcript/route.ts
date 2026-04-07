@@ -16,10 +16,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { clientId, periodId, transcript, meetingDate } = await request.json();
-    if (!clientId || !periodId || !transcript) {
+    const { clientId, periodId, transcript: rawTranscript, meetingDate } = await request.json();
+    if (!clientId || !periodId || !rawTranscript) {
       return Response.json({ error: "clientId, periodId, and transcript required" }, { status: 400 });
     }
+
+    // Truncate transcript if too long to avoid token limits
+    const transcript = typeof rawTranscript === "string" && rawTranscript.length > 8000
+      ? rawTranscript.slice(0, 8000) + "\n\n... [transcript truncated for processing]"
+      : rawTranscript;
 
     const supabase = getServiceClient();
 
@@ -103,7 +108,7 @@ Be specific. Reference actual numbers from the data. If action items mention spe
     // Build the notes data structure
     const notesData = {
       meetingDate: meetingDate || new Date().toISOString().split("T")[0],
-      transcript,
+      transcript: rawTranscript,
       summary: parsed.summary || "",
       keyDecisions: parsed.keyDecisions || [],
       meetingNotes: parsed.meetingNotes || "",
@@ -144,6 +149,13 @@ Be specific. Reference actual numbers from the data. If action items mention spe
     return Response.json({ success: true, notes: notesData });
   } catch (e) {
     console.error("Process transcript error:", e);
-    return Response.json({ error: String(e) }, { status: 500 });
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("timeout") || message.includes("ECONNRESET")) {
+      return Response.json({ error: "AI request timed out. Try again or shorten the transcript." }, { status: 504 });
+    }
+    if (message.includes("rate_limit") || message.includes("429")) {
+      return Response.json({ error: "AI rate limit reached. Please wait a minute and try again." }, { status: 429 });
+    }
+    return Response.json({ error: "Failed to process transcript: " + message }, { status: 500 });
   }
 }

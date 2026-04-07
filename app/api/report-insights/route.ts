@@ -101,6 +101,21 @@ export async function POST(request: NextRequest) {
 
     const anthropic = new Anthropic({ apiKey });
 
+    // Truncate transcript data in notes if present to avoid token limits
+    for (const note of pastNotes) {
+      if (note.notes && note.notes.length > 1500) {
+        note.notes = note.notes.slice(0, 1500) + "... [truncated]";
+      }
+    }
+
+    // Truncate transcript in sectionMap.notes if present
+    if (sectionMap.notes && typeof sectionMap.notes === "object") {
+      const notesObj = sectionMap.notes as Record<string, unknown>;
+      if (typeof notesObj.transcript === "string" && (notesObj.transcript as string).length > 4000) {
+        notesObj.transcript = (notesObj.transcript as string).slice(0, 4000) + "... [truncated]";
+      }
+    }
+
     // Build meeting notes context
     const meetingContext = pastNotes.length > 0
       ? `\n\nMEETING NOTES & STRATEGY SESSIONS:\n${JSON.stringify(pastNotes, null, 2).slice(0, 3000)}`
@@ -205,6 +220,13 @@ Be specific to THIS client's data. Use South African Rand (R). If a section has 
     return Response.json({ success: true, insights });
   } catch (e) {
     console.error("Report insights error:", e);
-    return Response.json({ error: String(e) }, { status: 500 });
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("timeout") || message.includes("ECONNRESET")) {
+      return Response.json({ error: "AI request timed out. Try again or reduce the amount of data." }, { status: 504 });
+    }
+    if (message.includes("rate_limit") || message.includes("429")) {
+      return Response.json({ error: "AI rate limit reached. Please wait a minute and try again." }, { status: 429 });
+    }
+    return Response.json({ error: "Failed to generate insights: " + message }, { status: 500 });
   }
 }
