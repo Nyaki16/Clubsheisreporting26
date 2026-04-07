@@ -16,12 +16,17 @@ interface ActionItem {
   status: "pending" | "in-progress" | "done";
 }
 
+interface NoteSection {
+  topic: string;
+  points: string[];
+}
+
 interface NotesData {
   meetingDate?: string;
   transcript?: string;
   summary: string;
   keyDecisions?: string[];
-  meetingNotes: string;
+  meetingNotes: string | NoteSection[];
   agencyActions: ActionItem[];
   clientActions: ActionItem[];
   dataInsights?: string[];
@@ -257,8 +262,29 @@ export function NotesContent({ slug }: { slug: string }) {
 
           {/* Meeting Notes */}
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Meeting Notes</h3>
-            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayNotes.meetingNotes}</div>
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Meeting Notes</h3>
+            {Array.isArray(displayNotes.meetingNotes) ? (
+              <div className="space-y-5">
+                {displayNotes.meetingNotes.map((section, i) => (
+                  <div key={i}>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4A1942]" />
+                      {section.topic}
+                    </h4>
+                    <ul className="space-y-1.5 ml-4">
+                      {section.points.map((point, j) => (
+                        <li key={j} className="text-sm text-gray-700 leading-relaxed flex items-start gap-2">
+                          <span className="text-gray-400 mt-1.5 flex-shrink-0">•</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayNotes.meetingNotes}</div>
+            )}
           </div>
 
           {/* Data Insights */}

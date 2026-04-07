@@ -77,7 +77,10 @@ Respond in this exact JSON format:
 {
   "summary": "3-5 sentence executive summary of what was discussed and decided",
   "keyDecisions": ["Decision 1", "Decision 2"],
-  "meetingNotes": "Detailed meeting notes organized by topic, written in bullet point format. Include specific numbers and commitments mentioned.",
+  "meetingNotes": [
+    {"topic": "Topic Name", "points": ["Specific point 1 with numbers", "Point 2", "Point 3"]},
+    {"topic": "Another Topic", "points": ["Point 1", "Point 2"]}
+  ],
   "agencyActions": [
     {"description": "What needs to be done", "owner": "Suggested owner/role", "dueDate": "YYYY-MM-DD or 'Next week' etc", "priority": "high|medium|low"}
   ],
