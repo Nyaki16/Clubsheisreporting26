@@ -159,7 +159,7 @@ export function KeyDates({ slug, variant = "default" }: { slug: string; variant?
       </div>
 
       {!editing && dates.length === 0 && (
-        <p className={`text-xs mt-1 ${isHeader ? "text-white/40" : "text-sm text-gray-400 mt-2"}`}>
+        <p className={`text-xs mt-1 ${isHeader ? "text-white/60" : "text-sm text-gray-400 mt-2"}`}>
           No key dates added yet. Click &quot;Add Date&quot; to track important upcoming dates.
         </p>
       )}
