@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Calendar, RefreshCw, FileText } from "lucide-react";
 import Link from "next/link";
+import { KeyDates } from "./KeyDates";
 
 interface Props {
   clientName: string;
@@ -144,6 +145,7 @@ export function DashboardHeader({
           <p className="text-white/70 text-sm mt-1">
             Monthly Performance Report — Meta Ads · Email Marketing · Social Media
           </p>
+          {slug && <KeyDates slug={slug} variant="header" />}
         </div>
       </div>
     </header>
