@@ -212,26 +212,26 @@ export function KeyDates({ slug, variant = "default" }: { slug: string; variant?
       )}
 
       {editing && (
-        <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className={`mt-4 bg-white border border-gray-200 rounded-xl p-4 space-y-3 ${isHeader ? "text-gray-900" : ""}`}>
           {draft.map((entry, i) => (
             <div key={entry.id} className="flex flex-wrap items-start gap-2 pb-3 border-b border-gray-100 last:border-0 last:pb-0">
               <input
                 type="date"
                 value={entry.date}
                 onChange={(e) => updateRow(i, "date", e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 w-40"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 w-40"
               />
               <input
                 type="text"
                 placeholder="Title (e.g. Junior Program Launch)"
                 value={entry.title}
                 onChange={(e) => updateRow(i, "title", e.target.value)}
-                className="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
+                className="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
               />
               <select
                 value={entry.category}
                 onChange={(e) => updateRow(i, "category", e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 w-32"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 w-32"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -242,7 +242,7 @@ export function KeyDates({ slug, variant = "default" }: { slug: string; variant?
                 placeholder="Description (optional)"
                 value={entry.description || ""}
                 onChange={(e) => updateRow(i, "description", e.target.value)}
-                className="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
+                className="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
               />
               <button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 p-2">
                 <Trash2 className="w-4 h-4" />
