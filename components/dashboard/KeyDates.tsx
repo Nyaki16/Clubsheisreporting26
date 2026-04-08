@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Plus, Trash2, Save, CalendarDays, Pencil, X } from "lucide-react";
 
-type Category = "Launch" | "Shoot" | "Deadline" | "Meeting" | "Campaign" | "Other";
+type Category = "Launch" | "Shoot" | "Deadline" | "Meeting" | "Campaign" | "Event" | "Course" | "Webinar" | "Program" | "Other";
 
 interface KeyDateEntry {
   id: string;
@@ -18,7 +18,7 @@ interface KeyDatesData {
   dates: KeyDateEntry[];
 }
 
-const CATEGORIES: Category[] = ["Launch", "Shoot", "Deadline", "Meeting", "Campaign", "Other"];
+const CATEGORIES: Category[] = ["Launch", "Shoot", "Deadline", "Meeting", "Campaign", "Event", "Course", "Webinar", "Program", "Other"];
 
 const CATEGORY_STYLES: Record<Category, string> = {
   Launch: "bg-purple-50 text-purple-700 border-purple-200",
@@ -26,6 +26,10 @@ const CATEGORY_STYLES: Record<Category, string> = {
   Deadline: "bg-red-50 text-red-700 border-red-200",
   Meeting: "bg-green-50 text-green-700 border-green-200",
   Campaign: "bg-amber-50 text-amber-700 border-amber-200",
+  Event: "bg-pink-50 text-pink-700 border-pink-200",
+  Course: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  Webinar: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  Program: "bg-orange-50 text-orange-700 border-orange-200",
   Other: "bg-gray-50 text-gray-600 border-gray-200",
 };
 
