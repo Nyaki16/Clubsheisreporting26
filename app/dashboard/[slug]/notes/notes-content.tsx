@@ -26,7 +26,7 @@ interface NotesData {
   transcript?: string;
   summary: string;
   keyDecisions?: string[];
-  meetingNotes: string | NoteSection[];
+  meetingNotes: string | (string | NoteSection)[];
   agencyActions: ActionItem[];
   clientActions: ActionItem[];
   dataInsights?: string[];
@@ -258,9 +258,13 @@ export function NotesContent({ slug }: { slug: string }) {
     html += `<h2>Meeting Notes</h2>`;
     if (Array.isArray(displayNotes.meetingNotes)) {
       displayNotes.meetingNotes.forEach(section => {
-        html += `<h3>${section.topic}</h3><ul>`;
-        section.points.forEach(p => { html += `<li>${p}</li>`; });
-        html += `</ul>`;
+        if (typeof section === "string") {
+          html += `<p>${section}</p>`;
+        } else {
+          html += `<h3>${section.topic}</h3><ul>`;
+          section.points.forEach(p => { html += `<li>${p}</li>`; });
+          html += `</ul>`;
+        }
       });
     } else {
       html += `<p>${displayNotes.meetingNotes}</p>`;
@@ -309,7 +313,7 @@ export function NotesContent({ slug }: { slug: string }) {
       case "meetingNotes":
         setEditMeetingNotes(
           Array.isArray(displayNotes.meetingNotes)
-            ? displayNotes.meetingNotes.map(s => ({ ...s, points: [...s.points] }))
+            ? displayNotes.meetingNotes.map(s => typeof s === "string" ? { topic: s, points: [] } : { ...s, points: [...s.points] })
             : [{ topic: "Notes", points: [String(displayNotes.meetingNotes)] }]
         );
         break;
