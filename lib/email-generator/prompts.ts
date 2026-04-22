@@ -26,6 +26,7 @@ Return a single JSON object with these exact fields — no prose, no markdown fe
   "collectionLabel": "short uppercase label above the hero headline (max 3 words, e.g. 'NEW COLLECTION', 'AUTUMN ARRIVALS')",
   "heroHeadline": "main hero headline (max 8 words, serif display treatment, evocative)",
   "heroSubheadline": "supporting line under hero headline (max 16 words)",
+  "leadParagraph": "The tone-setter for the whole email. 4–6 sentences that flow directly from the theme and frame the rest of the pieces. Magazine editorial voice — warm, luxurious, unhurried. Reference the mood, season, or sensibility the theme suggests. Do NOT describe individual products here and do NOT mention prices. Think of it as the opening paragraph of a magazine feature.",
   "statsStrip": ["stat 1", "stat 2", "stat 3"],
   "collectionIntroLabel": "label above the curated product grid (e.g. 'The Curated Edit')",
   "collectionIntroTagline": "supporting line (e.g. 'Pieces that anchor the room')",

@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
     copy.individualSectionLabel = copy.individualSectionLabel || "Also Available";
     copy.individualSectionTagline = copy.individualSectionTagline || "Handpicked additions";
     copy.individualNarrative = copy.individualNarrative || "";
+    copy.leadParagraph = copy.leadParagraph || "";
 
     const html = buildDraftHtml({ products, copy, curatedTotalZar });
     const slots = planSlots(products);

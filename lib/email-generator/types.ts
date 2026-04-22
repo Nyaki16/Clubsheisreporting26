@@ -19,6 +19,7 @@ export interface AICopy {
   collectionLabel: string;
   heroHeadline: string;
   heroSubheadline: string;
+  leadParagraph: string;
   statsStrip: [string, string, string];
   collectionIntroLabel: string;
   collectionIntroTagline: string;
@@ -32,7 +33,7 @@ export interface AICopy {
   finalCtaBody: string;
 }
 
-export type SlotLayout = "hero" | "full" | "half" | "showcase";
+export type SlotLayout = "hero" | "full" | "half" | "showcase" | "banner";
 
 export interface ImageSlot {
   id: string;

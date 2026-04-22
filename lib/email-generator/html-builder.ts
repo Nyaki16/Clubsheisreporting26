@@ -65,6 +65,7 @@ export function planSlots(products: ProductInput[]): ImageSlot[] {
   const slots: ImageSlot[] = [{ id: "hero", layout: "hero", width: 600 }];
   const { curated, individual } = partitionProducts(products);
   addGridSlots(slots, curated);
+  slots.push({ id: "collection-banner", layout: "banner", width: 600 });
   if (individual.length > 0) {
     const first = individual.slice(0, 4);
     const rest = individual.slice(4);
@@ -251,7 +252,7 @@ ${restGrid}
     .stack-row { display: block !important; }
     .stack, .stack-table { width: 100% !important; max-width: 100% !important; display: block !important; }
     .stack-gap { display: none !important; width: 0 !important; }
-    .hero-img, .full-img, .showcase-img { width: 100% !important; max-width: 100% !important; height: auto !important; }
+    .hero-img, .full-img, .showcase-img, .banner-img { width: 100% !important; max-width: 100% !important; height: auto !important; }
     .cta-btn { padding: 12px 14px !important; font-size: 10px !important; letter-spacing: 2px !important; white-space: nowrap !important; }
   }
 </style>
@@ -287,6 +288,15 @@ ${restGrid}
             <div style="font-family:${F.serif};font-size:16px;line-height:1.5;font-style:italic;color:${P.greyText};max-width:420px;margin:0 auto;">${esc(copy.heroSubheadline)}</div>
           </td>
         </tr>
+${copy.leadParagraph
+  ? `
+        <!-- Lead Paragraph (theme-driven tone setter) -->
+        <tr>
+          <td align="center" style="padding:24px 40px 28px 40px;">
+            <div style="font-family:${F.serif};font-size:16px;line-height:1.75;font-weight:300;color:${P.white};max-width:480px;margin:0 auto;">${esc(copy.leadParagraph)}</div>
+          </td>
+        </tr>`
+  : ""}
 
         <!-- Stats Strip (curated totals) -->
         <tr>
@@ -308,11 +318,12 @@ ${restGrid}
         <!-- Curated Grid -->
         ${curatedGrid}
 
-        <!-- Shop The Collection Banner -->
+        <!-- Shop The Collection Banner (with full-frame image) -->
         <tr>
           <td style="padding:12px 0 12px 0;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${P.charcoal};">
-              <tr><td align="center" style="padding:48px 20px 20px 20px;font-family:${F.sans};font-size:10px;font-weight:500;letter-spacing:4px;text-transform:uppercase;color:${P.gold};">${esc(copy.completeTheLookLine)}</td></tr>
+              <tr><td style="padding:0;line-height:0;font-size:0;">${placeholderBlock("collection-banner", "COLLECTION BANNER IMAGE", 300)}</td></tr>
+              <tr><td align="center" style="padding:40px 20px 20px 20px;font-family:${F.sans};font-size:10px;font-weight:500;letter-spacing:4px;text-transform:uppercase;color:${P.gold};">${esc(copy.completeTheLookLine)}</td></tr>
               <tr><td align="center" style="padding:0 20px 28px 20px;font-family:${F.serif};font-size:44px;font-weight:300;color:${P.gold};letter-spacing:2px;">${formatZar(curatedTotalZar)}</td></tr>
               <tr><td align="center" style="padding:0 20px 48px 20px;"><a href="${C.whatsapp}" style="display:inline-block;padding:14px 32px;background-color:${P.gold};color:${P.black};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border-radius:2px;">Shop The Collection</a></td></tr>
             </table>
@@ -369,6 +380,8 @@ export function swapPlaceholders(html: string, urls: SlotUrlMap, slots: ImageSlo
         ? "hero-img"
         : slot.layout === "showcase"
         ? "showcase-img"
+        : slot.layout === "banner"
+        ? "banner-img"
         : "full-img";
     const imgTag = `<img src="${escAttr(url)}" alt="${escAttr(alt)}" width="${slot.width}" class="${className}" style="display:block;width:100%;max-width:${slot.width}px;height:auto;border:0;outline:none;text-decoration:none;" />`;
     const re = new RegExp(`<!--BEGIN_SLOT:${slot.id}-->[\\s\\S]*?<!--END_SLOT:${slot.id}-->`, "g");
