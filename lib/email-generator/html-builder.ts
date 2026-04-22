@@ -252,6 +252,7 @@ ${restGrid}
     .stack, .stack-table { width: 100% !important; max-width: 100% !important; display: block !important; }
     .stack-gap { display: none !important; width: 0 !important; }
     .hero-img, .full-img, .showcase-img { width: 100% !important; max-width: 100% !important; height: auto !important; }
+    .cta-btn { padding: 12px 14px !important; font-size: 10px !important; letter-spacing: 2px !important; white-space: nowrap !important; }
   }
 </style>
 </head>
@@ -333,8 +334,8 @@ ${restGrid}
             <div style="font-family:${F.serif};font-size:28px;font-weight:300;color:${P.white};letter-spacing:1px;margin-top:32px;margin-bottom:14px;">${esc(copy.finalCtaHeadline)}</div>
             <div style="font-family:${F.sans};font-size:13px;line-height:1.6;color:${P.greyText};max-width:440px;margin:0 auto 28px auto;">${esc(copy.finalCtaBody)}</div>
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td style="padding:0 8px;"><a href="${C.whatsapp}" style="display:inline-block;padding:14px 28px;background-color:${P.gold};color:${P.black};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border-radius:2px;">WhatsApp Us</a></td>
-              <td style="padding:0 8px;"><a href="tel:${C.phone.replace(/\s+/g, "")}" style="display:inline-block;padding:13px 28px;background-color:transparent;color:${P.gold};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border:1px solid ${P.gold};border-radius:2px;">Call Us</a></td>
+              <td style="padding:0 6px;"><a class="cta-btn" href="${C.whatsapp}" style="display:inline-block;padding:14px 28px;background-color:${P.gold};color:${P.black};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border-radius:2px;white-space:nowrap;">WhatsApp Us</a></td>
+              <td style="padding:0 6px;"><a class="cta-btn" href="tel:${C.phone.replace(/\s+/g, "")}" style="display:inline-block;padding:13px 28px;background-color:transparent;color:${P.gold};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border:1px solid ${P.gold};border-radius:2px;white-space:nowrap;">Call Us</a></td>
             </tr></table>
           </td>
         </tr>
