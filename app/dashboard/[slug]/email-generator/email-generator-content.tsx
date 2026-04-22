@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +12,8 @@ import {
   X,
   Upload,
   Image as ImageIcon,
+  Save,
+  RefreshCw,
 } from "lucide-react";
 import { swapPlaceholders } from "@/lib/email-generator/html-builder";
 import type { AICopy, ImageSlot, SlotUrlMap } from "@/lib/email-generator/types";
@@ -60,6 +62,146 @@ async function safeJson(res: Response): Promise<{ error?: string; data?: { url: 
   }
   const text = await res.text().catch(() => "");
   return { error: text.slice(0, 180) || `HTTP ${res.status}` };
+}
+
+const CSV_TEMPLATE = `name,priceZar,productUrl,description,dimensions
+The Ava,32500,https://linkinterior.co.za/products/the-ava,Sculptural Floor Lamp · Matte Black,H 180cm · W 120cm · D 45cm
+The Noor,18900,https://linkinterior.co.za/products/the-noor,Accent Side Table · Travertine,
+`;
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+      } else {
+        cell += ch;
+        i++;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+        i++;
+      } else if (ch === ",") {
+        row.push(cell);
+        cell = "";
+        i++;
+      } else if (ch === "\n") {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+        i++;
+      } else if (ch === "\r") {
+        i++;
+      } else {
+        cell += ch;
+        i++;
+      }
+    }
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseProductsCsv(text: string): { rows: ProductRow[]; errors: string[] } {
+  const parsed = parseCsv(text).filter((r) => r.some((c) => c.trim() !== ""));
+  if (parsed.length === 0) return { rows: [], errors: ["CSV is empty"] };
+  const header = parsed[0].map((h) => h.trim().toLowerCase());
+  const findCol = (...names: string[]) => {
+    for (const n of names) {
+      const idx = header.indexOf(n.toLowerCase());
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  };
+  const idxName = findCol("name", "product name", "product");
+  const idxPrice = findCol("pricezar", "price", "price (zar)", "price_zar");
+  const idxUrl = findCol("producturl", "product url", "url", "product_url");
+  const idxDesc = findCol("description", "desc");
+  const idxDims = findCol("dimensions", "size", "dim");
+  if (idxName < 0 || idxPrice < 0 || idxUrl < 0) {
+    return {
+      rows: [],
+      errors: ["CSV header must include: name, priceZar, productUrl (description and dimensions are optional)"],
+    };
+  }
+  const rows: ProductRow[] = [];
+  const errors: string[] = [];
+  for (let i = 1; i < parsed.length; i++) {
+    const r = parsed[i];
+    const name = (r[idxName] || "").trim();
+    const priceRaw = (r[idxPrice] || "").trim().replace(/[Rr,\s]/g, "");
+    const productUrl = (r[idxUrl] || "").trim();
+    if (!name && !priceRaw && !productUrl) continue;
+    if (!name) {
+      errors.push(`Row ${i + 1}: missing name`);
+      continue;
+    }
+    const priceZar = Number(priceRaw);
+    if (!Number.isFinite(priceZar) || priceZar <= 0) {
+      errors.push(`Row ${i + 1}: invalid price "${r[idxPrice]}"`);
+      continue;
+    }
+    if (!/^https?:\/\//i.test(productUrl)) {
+      errors.push(`Row ${i + 1}: invalid URL`);
+      continue;
+    }
+    rows.push({
+      name,
+      priceZar: String(priceZar),
+      productUrl,
+      description: idxDesc >= 0 ? (r[idxDesc] || "").trim() : "",
+      dimensions: idxDims >= 0 ? (r[idxDims] || "").trim() : "",
+    });
+  }
+  if (rows.length === 0 && errors.length === 0) {
+    errors.push("No product rows found in CSV");
+  }
+  return { rows, errors };
+}
+
+function downloadBlob(filename: string, mime: string, content: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(diff) || diff < 0) return "just now";
+  const sec = Math.floor(diff / 1000);
+  if (sec < 10) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
 }
 
 async function resizeImageIfNeeded(
@@ -114,6 +256,62 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const [finalHtml, setFinalHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedSubject, setCopiedSubject] = useState(false);
+
+  const [loadingSaved, setLoadingSaved] = useState(slug === ACCESS_SLUG);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvInfo, setCsvInfo] = useState<string | null>(null);
+  const loadedOnce = useRef(false);
+
+  useEffect(() => {
+    if (slug !== ACCESS_SLUG) return;
+    if (loadedOnce.current) return;
+    loadedOnce.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/email-generator/state", { method: "GET" });
+        if (!res.ok) {
+          setLoadingSaved(false);
+          return;
+        }
+        const result = await res.json();
+        const saved = result?.data;
+        if (saved && typeof saved === "object") {
+          if (saved.form?.campaignDate) setCampaignDate(saved.form.campaignDate);
+          if (typeof saved.form?.theme === "string") setTheme(saved.form.theme);
+          if (Array.isArray(saved.form?.products) && saved.form.products.length > 0) {
+            setProducts(saved.form.products);
+          }
+          if (saved.draft && saved.draft.html) setDraft(saved.draft as DraftData);
+          if (saved.slotUrls && typeof saved.slotUrls === "object") {
+            const restored: Record<string, SlotState> = {};
+            for (const [id, v] of Object.entries(saved.slotUrls as Record<string, { url: string; fileName?: string }>)) {
+              restored[id] = { uploading: false, url: v.url, fileName: v.fileName };
+            }
+            setSlotStates(restored);
+          }
+          if (result.updatedAt) setLastSavedAt(result.updatedAt);
+        }
+      } catch {
+        // fall through; user just won't have restored state
+      } finally {
+        setLoadingSaved(false);
+      }
+    })();
+  }, [slug]);
+
+  const hasHydrated = useRef(false);
+  useEffect(() => {
+    if (loadingSaved) return;
+    if (!hasHydrated.current) {
+      hasHydrated.current = true;
+      return;
+    }
+    setDirty(true);
+  }, [campaignDate, theme, products, draft, slotStates, loadingSaved]);
 
   const addRow = () => setProducts((ps) => [...ps, { ...EMPTY_ROW }]);
   const removeRow = (i: number) =>
@@ -296,6 +494,89 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     URL.revokeObjectURL(url);
   }, [finalHtml, campaignDate]);
 
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const slotUrls: Record<string, { url: string; fileName?: string }> = {};
+      for (const [id, s] of Object.entries(slotStates)) {
+        if (s?.url) slotUrls[id] = { url: s.url, fileName: s.fileName };
+      }
+      const payload = {
+        form: { campaignDate, theme, products },
+        draft,
+        slotUrls,
+      };
+      const res = await fetch("/api/email-generator/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(result.error || `Save failed (HTTP ${res.status})`);
+        return;
+      }
+      setLastSavedAt(result.updatedAt || new Date().toISOString());
+      setDirty(false);
+    } catch (e) {
+      setSaveError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }, [campaignDate, theme, products, draft, slotStates]);
+
+  const handleDownloadTemplate = useCallback(() => {
+    downloadBlob("link-interiors-products-template.csv", "text/csv;charset=utf-8;", CSV_TEMPLATE);
+  }, []);
+
+  const handleCsvUpload = useCallback(async (file: File) => {
+    setCsvError(null);
+    setCsvInfo(null);
+    try {
+      const text = await file.text();
+      const { rows, errors } = parseProductsCsv(text);
+      if (rows.length === 0) {
+        setCsvError(errors.join(" · ") || "No valid rows found");
+        return;
+      }
+      setProducts(rows);
+      if (errors.length > 0) {
+        setCsvInfo(
+          `Imported ${rows.length} product${rows.length === 1 ? "" : "s"} · Skipped: ${errors.join("; ")}`
+        );
+      } else {
+        setCsvInfo(`Imported ${rows.length} product${rows.length === 1 ? "" : "s"} from CSV`);
+      }
+    } catch (e) {
+      setCsvError(String(e));
+    }
+  }, []);
+
+  const handleStartAgain = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "Discard current campaign and start over? This clears the form, the draft, and uploaded image references. The images themselves stay in your GHL media library."
+      );
+      if (!ok) return;
+    }
+    try {
+      await fetch("/api/email-generator/state", { method: "DELETE" });
+    } catch {
+      // proceed anyway — clear local state even if the delete failed
+    }
+    setCampaignDate(new Date().toISOString().slice(0, 10));
+    setTheme("");
+    setProducts([{ ...EMPTY_ROW }]);
+    setDraft(null);
+    setDraftError(null);
+    setSlotStates({});
+    setFinalHtml(null);
+    setLastSavedAt(null);
+    setDirty(false);
+    setSaveError(null);
+  }, []);
+
   if (slug !== ACCESS_SLUG) {
     return (
       <div className="space-y-4">
@@ -309,16 +590,70 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     );
   }
 
+  const statusText = loadingSaved
+    ? "Loading saved campaign…"
+    : saving
+    ? "Saving…"
+    : dirty
+    ? lastSavedAt
+      ? "Unsaved changes"
+      : "Not saved yet"
+    : lastSavedAt
+    ? `Saved ${formatRelativeTime(lastSavedAt)}`
+    : "";
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="font-serif text-xl font-semibold text-gray-900">
-          Email Generator
-        </h2>
-        <p className="text-sm text-gray-500">
-          Weekly product email for Link Interiors — AI-drafted copy, branded template, images uploaded straight to the GHL media library.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-serif text-xl font-semibold text-gray-900">
+            Email Generator
+          </h2>
+          <p className="text-sm text-gray-500">
+            Weekly product email for Link Interiors — AI-drafted copy, branded template, images uploaded straight to the GHL media library.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {statusText && (
+            <span
+              className={`text-xs ${
+                dirty && !saving
+                  ? "text-amber-600"
+                  : saving
+                  ? "text-gray-500"
+                  : "text-emerald-600"
+              }`}
+            >
+              {statusText}
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#3a1335] px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5" />
+            )}
+            Save
+          </button>
+          <button
+            onClick={handleStartAgain}
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Start again
+          </button>
+        </div>
       </div>
+
+      {saveError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          {saveError}
+        </div>
+      )}
 
       {/* 1. Campaign inputs */}
       <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
@@ -355,18 +690,51 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
 
         {/* Products */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <label className="text-xs font-medium text-gray-700">
               Products
             </label>
-            <button
-              onClick={addRow}
-              type="button"
-              className="flex items-center gap-1 text-xs font-medium text-[#4A1942] hover:text-[#3a1335]"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add product
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadTemplate}
+                type="button"
+                className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+              >
+                <Download className="w-3.5 h-3.5" /> Template
+              </button>
+              <label className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> Upload CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleCsvUpload(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <button
+                onClick={addRow}
+                type="button"
+                className="flex items-center gap-1 text-xs font-medium text-[#4A1942] hover:text-[#3a1335]"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add product
+              </button>
+            </div>
           </div>
+
+          {csvError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+              {csvError}
+            </div>
+          )}
+          {csvInfo && !csvError && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-700">
+              {csvInfo}
+            </div>
+          )}
 
           <div className="space-y-3">
             {products.map((p, i) => (
