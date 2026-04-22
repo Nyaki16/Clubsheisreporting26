@@ -69,7 +69,16 @@ The Ava,32500,https://linkinterior.co.za/products/the-ava,Sculptural Floor Lamp 
 The Noor,18900,https://linkinterior.co.za/products/the-noor,Accent Side Table · Travertine,
 `;
 
-function parseCsv(text: string): string[][] {
+function detectDelimiter(firstLine: string): string {
+  const commas = (firstLine.match(/,/g) || []).length;
+  const semis = (firstLine.match(/;/g) || []).length;
+  const tabs = (firstLine.match(/\t/g) || []).length;
+  if (semis > commas && semis > tabs) return ";";
+  if (tabs > commas && tabs > semis) return "\t";
+  return ",";
+}
+
+function parseCsv(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -95,7 +104,7 @@ function parseCsv(text: string): string[][] {
       if (ch === '"') {
         inQuotes = true;
         i++;
-      } else if (ch === ",") {
+      } else if (ch === delimiter) {
         row.push(cell);
         cell = "";
         i++;
@@ -121,25 +130,39 @@ function parseCsv(text: string): string[][] {
 }
 
 function parseProductsCsv(text: string): { rows: ProductRow[]; errors: string[] } {
-  const parsed = parseCsv(text).filter((r) => r.some((c) => c.trim() !== ""));
+  // Strip UTF-8 BOM that Excel adds to the first cell
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const delimiter = detectDelimiter(firstLine);
+  const parsed = parseCsv(text, delimiter).filter((r) => r.some((c) => c.trim() !== ""));
   if (parsed.length === 0) return { rows: [], errors: ["CSV is empty"] };
-  const header = parsed[0].map((h) => h.trim().toLowerCase());
+  const normalize = (s: string) =>
+    s.trim().toLowerCase().replace(/[\s_()-]/g, "");
+  const header = parsed[0].map(normalize);
   const findCol = (...names: string[]) => {
     for (const n of names) {
-      const idx = header.indexOf(n.toLowerCase());
+      const idx = header.indexOf(normalize(n));
       if (idx >= 0) return idx;
     }
     return -1;
   };
-  const idxName = findCol("name", "product name", "product");
-  const idxPrice = findCol("pricezar", "price", "price (zar)", "price_zar");
-  const idxUrl = findCol("producturl", "product url", "url", "product_url");
-  const idxDesc = findCol("description", "desc");
-  const idxDims = findCol("dimensions", "size", "dim");
+  const idxName = findCol("name", "product name", "product", "item");
+  const idxPrice = findCol("pricezar", "price", "price zar", "cost");
+  const idxUrl = findCol("producturl", "url", "link", "product link");
+  const idxDesc = findCol("description", "desc", "short description");
+  const idxDims = findCol("dimensions", "size", "dim", "measurements");
   if (idxName < 0 || idxPrice < 0 || idxUrl < 0) {
+    const foundHeaders = parsed[0].map((h) => h.trim()).filter(Boolean).join(", ") || "(empty)";
+    const missing = [
+      idxName < 0 ? "name" : null,
+      idxPrice < 0 ? "priceZar" : null,
+      idxUrl < 0 ? "productUrl" : null,
+    ].filter(Boolean).join(", ");
     return {
       rows: [],
-      errors: ["CSV header must include: name, priceZar, productUrl (description and dimensions are optional)"],
+      errors: [
+        `Missing columns: ${missing}. Found headers: ${foundHeaders}. (Delimiter detected: "${delimiter === "\t" ? "TAB" : delimiter}")`,
+      ],
     };
   }
   const rows: ProductRow[] = [];
