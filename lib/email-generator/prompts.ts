@@ -12,7 +12,11 @@ Brand voice:
 - South African English spelling (e.g. "colour", not "color")
 - Currency: ZAR (Rand), formatted "R 32,500"
 
-Your job is to generate ALL copy for a weekly product email given a theme and a list of products with names, prices, and optional descriptions/dimensions.
+The email is structured as two groups:
+
+1. **The Curated Edit** — the featured collection. A hero lifestyle image, a headline, a stats strip, and product cards. The "Shop The Collection" banner totals the prices of ONLY the curated items. Copy in this section should feel cohesive and considered, as if the pieces belong together.
+
+2. **Also Available** (optional — appears only when there are non-curated products) — additional items for sale that are not part of the curated edit. Between the first four individual product cards and any remaining cards, there is a landscape showcase image and a short narrative paragraph. This section's copy should feel like a gentle second act — handpicked additions, not a sales push.
 
 Return a single JSON object with these exact fields — no prose, no markdown fences:
 
@@ -23,18 +27,21 @@ Return a single JSON object with these exact fields — no prose, no markdown fe
   "heroHeadline": "main hero headline (max 8 words, serif display treatment, evocative)",
   "heroSubheadline": "supporting line under hero headline (max 16 words)",
   "statsStrip": ["stat 1", "stat 2", "stat 3"],
-  "collectionIntroLabel": "label above the product grid (e.g. 'The Curated Collection')",
-  "collectionIntroTagline": "supporting line (e.g. 'Handpicked Pieces, Individually Priced')",
-  "productDescriptions": ["one short uppercase tagline per product, max 6 words, e.g. 'Sculptural Floor Lamp · Matte Black'. Use the user's description if provided; otherwise generate."],
-  "completeTheLookLine": "short line above the total price in the Complete-The-Look banner (e.g. 'Complete This Look From', max 5 words)",
-  "brandPromise": "italic brand promise at the bottom of the email. Should feel like a magazine pull-quote, max 30 words.",
+  "collectionIntroLabel": "label above the curated product grid (e.g. 'The Curated Edit')",
+  "collectionIntroTagline": "supporting line (e.g. 'Pieces that anchor the room')",
+  "productDescriptions": ["one short uppercase tagline per product, max 6 words. MUST be in the same order and count as the products provided."],
+  "completeTheLookLine": "short line above the total price in the Shop-The-Collection banner (e.g. 'Dress All Four Rooms From', max 6 words)",
+  "individualSectionLabel": "short label for the Also Available section (max 3 words, e.g. 'Also Available', 'Handpicked Additions'). Generate even if no individuals exist — it will only render when needed.",
+  "individualSectionTagline": "supporting line under the Also Available label (max 10 words)",
+  "individualNarrative": "a short editorial narrative between the first four individual items and any that follow. 30–50 words, magazine-pull-quote feel, no hard sell.",
+  "brandPromise": "italic brand promise at the bottom of the email. Magazine pull-quote, max 30 words.",
   "finalCtaHeadline": "headline for the final CTA section (max 5 words, e.g. 'Your Space Deserves This')",
-  "finalCtaBody": "short paragraph for the final CTA, 1-2 sentences, inviting a consultation via WhatsApp. Max 40 words."
+  "finalCtaBody": "short paragraph for the final CTA, 1-2 sentences inviting a WhatsApp consultation. Max 40 words."
 }
 
-For statsStrip: three short stats separated across the strip. One should be the piece count (e.g. "4 Pieces"), one the total collection value ("R 175,600"), one a descriptive stat that fits the theme ("Made to Order", "Ships South Africa-Wide", "Handcrafted in Johannesburg", "In Stock Now" — pick what's authentic for the theme). Keep each stat under 4 words.
+statsStrip: three short stats separated across the strip. Base them on the CURATED subset only. One stat is the curated piece count (e.g. "4 Pieces"), one is the curated total value ("R 175,600"), one is a theme-appropriate descriptor ("Made to Order", "Ships South Africa-Wide", "Handcrafted in Johannesburg", "In Stock Now"). Keep each under 4 words.
 
-For productDescriptions: the array length MUST exactly match the number of products provided, in the same order.
+productDescriptions: the array length MUST exactly match the TOTAL number of products provided (curated + individual combined), in the same order they are given. Use the user's description hint if provided; otherwise generate.
 
 Rules:
 - Output must be parseable JSON. No trailing commas, no comments.
@@ -45,12 +52,15 @@ export function buildUserPrompt(input: {
   theme: string;
   campaignDate: string;
   products: ProductInput[];
-  totalZar: number;
+  curatedTotalZar: number;
+  curatedCount: number;
+  individualCount: number;
 }): string {
   const productsList = input.products
     .map((p, i) => {
+      const tag = p.curated === false ? "[INDIVIDUAL]" : "[CURATED]";
       const parts = [
-        `${i + 1}. ${p.name} — R ${p.priceZar.toLocaleString("en-ZA")}`,
+        `${i + 1}. ${tag} ${p.name} — R ${p.priceZar.toLocaleString("en-ZA")}`,
       ];
       if (p.description) parts.push(`   description hint: ${p.description}`);
       if (p.dimensions) parts.push(`   dimensions: ${p.dimensions}`);
@@ -61,10 +71,11 @@ export function buildUserPrompt(input: {
 
   return `Campaign date: ${input.campaignDate}
 Theme: ${input.theme || "(none — treat as new arrivals)"}
-Product count: ${input.products.length}
-Total collection value: R ${input.totalZar.toLocaleString("en-ZA")}
+Curated count: ${input.curatedCount}
+Individual count: ${input.individualCount}
+Curated total (for the Shop-The-Collection banner): R ${input.curatedTotalZar.toLocaleString("en-ZA")}
 
-Products:
+Products (preserving order — productDescriptions array must match):
 ${productsList}
 
 Generate the JSON object now.`;

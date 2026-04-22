@@ -16,67 +16,61 @@ function escAttr(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
-type Row =
-  | { type: "full"; index: number }
-  | { type: "pair"; indices: [number, number] };
+type Indexed = { product: ProductInput; originalIndex: number };
 
-export function planProductRows(n: number): Row[] {
-  if (n <= 0) return [];
-  if (n === 1) return [{ type: "full", index: 0 }];
-  if (n === 2) return [
-    { type: "full", index: 0 },
-    { type: "full", index: 1 },
-  ];
-  if (n === 3) return [
-    { type: "full", index: 0 },
-    { type: "pair", indices: [1, 2] },
-  ];
-  const rows: Row[] = [
-    { type: "full", index: 0 },
-    { type: "full", index: 1 },
-  ];
-  let i = 2;
-  while (i < n) {
-    if (i + 1 < n) {
-      rows.push({ type: "pair", indices: [i, i + 1] });
+function partitionProducts(products: ProductInput[]): {
+  curated: Indexed[];
+  individual: Indexed[];
+} {
+  const curated: Indexed[] = [];
+  const individual: Indexed[] = [];
+  products.forEach((product, originalIndex) => {
+    const entry = { product, originalIndex };
+    if (product.curated === false) individual.push(entry);
+    else curated.push(entry);
+  });
+  return { curated, individual };
+}
+
+function makeProductSlot(
+  entry: Indexed,
+  layout: "half" | "full",
+  width: number
+): ImageSlot {
+  return {
+    id: `product-${entry.originalIndex}`,
+    layout,
+    width,
+    productIndex: entry.originalIndex,
+    productName: entry.product.name,
+    productUrl: entry.product.productUrl,
+  };
+}
+
+function addGridSlots(slots: ImageSlot[], items: Indexed[]): void {
+  let i = 0;
+  while (i < items.length) {
+    if (i + 1 < items.length) {
+      slots.push(makeProductSlot(items[i], "half", 270));
+      slots.push(makeProductSlot(items[i + 1], "half", 270));
       i += 2;
     } else {
-      rows.push({ type: "full", index: i });
+      slots.push(makeProductSlot(items[i], "full", 570));
       i += 1;
     }
   }
-  return rows;
 }
 
 export function planSlots(products: ProductInput[]): ImageSlot[] {
-  const slots: ImageSlot[] = [
-    { id: "hero", layout: "hero", width: 600 },
-  ];
-  const rows = planProductRows(products.length);
-  for (const row of rows) {
-    if (row.type === "full") {
-      const p = products[row.index];
-      slots.push({
-        id: `product-${row.index}`,
-        layout: "full",
-        width: 570,
-        productIndex: row.index,
-        productName: p.name,
-        productUrl: p.productUrl,
-      });
-    } else {
-      for (const idx of row.indices) {
-        const p = products[idx];
-        slots.push({
-          id: `product-${idx}`,
-          layout: "half",
-          width: 270,
-          productIndex: idx,
-          productName: p.name,
-          productUrl: p.productUrl,
-        });
-      }
-    }
+  const slots: ImageSlot[] = [{ id: "hero", layout: "hero", width: 600 }];
+  const { curated, individual } = partitionProducts(products);
+  addGridSlots(slots, curated);
+  if (individual.length > 0) {
+    const first = individual.slice(0, 4);
+    const rest = individual.slice(4);
+    addGridSlots(slots, first);
+    slots.push({ id: "showcase", layout: "showcase", width: 600 });
+    if (rest.length > 0) addGridSlots(slots, rest);
   }
   return slots;
 }
@@ -144,19 +138,35 @@ function pairRow(left: string, right: string): string {
 </tr>`;
 }
 
-function buildProductShowcase(products: ProductInput[], descriptions: string[]): string {
-  const rows = planProductRows(products.length);
+function buildProductGrid(items: Indexed[], descriptions: string[]): string {
+  let i = 0;
   const parts: string[] = [];
-  for (const row of rows) {
-    if (row.type === "full") {
-      const p = products[row.index];
-      const d = descriptions[row.index] || "";
-      parts.push(productCardFull(p, d, `product-${row.index}`));
-    } else {
-      const [a, b] = row.indices;
-      const left = productCardHalf(products[a], descriptions[a] || "", `product-${a}`);
-      const right = productCardHalf(products[b], descriptions[b] || "", `product-${b}`);
+  while (i < items.length) {
+    if (i + 1 < items.length) {
+      const a = items[i];
+      const b = items[i + 1];
+      const left = productCardHalf(
+        a.product,
+        descriptions[a.originalIndex] || "",
+        `product-${a.originalIndex}`
+      );
+      const right = productCardHalf(
+        b.product,
+        descriptions[b.originalIndex] || "",
+        `product-${b.originalIndex}`
+      );
       parts.push(pairRow(left, right));
+      i += 2;
+    } else {
+      const a = items[i];
+      parts.push(
+        productCardFull(
+          a.product,
+          descriptions[a.originalIndex] || "",
+          `product-${a.originalIndex}`
+        )
+      );
+      i += 1;
     }
   }
   return parts.join("\n");
@@ -165,10 +175,14 @@ function buildProductShowcase(products: ProductInput[], descriptions: string[]):
 export interface BuildDraftArgs {
   products: ProductInput[];
   copy: AICopy;
-  totalZar: number;
+  curatedTotalZar: number;
 }
 
-export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): string {
+export function buildDraftHtml({ products, copy, curatedTotalZar }: BuildDraftArgs): string {
+  const { curated, individual } = partitionProducts(products);
+  const firstIndividuals = individual.slice(0, 4);
+  const restIndividuals = individual.slice(4);
+
   const statsHtml = copy.statsStrip
     .map(
       (s) =>
@@ -176,7 +190,44 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
     )
     .join(`<td style="padding:0;font-family:${F.sans};font-size:14px;color:${P.gold};">|</td>`);
 
-  const productShowcase = buildProductShowcase(products, copy.productDescriptions);
+  const curatedGrid = buildProductGrid(curated, copy.productDescriptions);
+
+  let alsoAvailable = "";
+  if (individual.length > 0) {
+    const firstGrid = buildProductGrid(firstIndividuals, copy.productDescriptions);
+    const showcaseBlock = `
+<tr>
+  <td style="padding:24px 0 24px 0;">
+    ${placeholderBlock("showcase", "SHOWCASE IMAGE", 360)}
+  </td>
+</tr>`;
+    const narrativeBlock = copy.individualNarrative
+      ? `
+<tr>
+  <td align="center" style="padding:12px 40px 40px 40px;">
+    <div style="font-family:${F.serif};font-size:17px;line-height:1.6;font-style:italic;font-weight:300;color:${P.white};max-width:460px;margin:0 auto;">${esc(copy.individualNarrative)}</div>
+  </td>
+</tr>`
+      : "";
+    const restGrid = restIndividuals.length > 0
+      ? buildProductGrid(restIndividuals, copy.productDescriptions)
+      : "";
+
+    alsoAvailable = `
+<!-- Also Available Header -->
+<tr>
+  <td align="center" style="padding:16px 20px 8px 20px;border-top:1px solid ${P.charcoal};">
+    <div style="font-family:${F.serif};font-size:22px;font-weight:300;color:${P.white};letter-spacing:1px;margin-top:32px;margin-bottom:8px;">${esc(copy.individualSectionLabel)}</div>
+    <div style="font-family:${F.sans};font-size:10px;font-weight:400;letter-spacing:3px;text-transform:uppercase;color:${P.greyText};margin-bottom:28px;">${esc(copy.individualSectionTagline)}</div>
+  </td>
+</tr>
+
+${firstGrid}
+${showcaseBlock}
+${narrativeBlock}
+${restGrid}
+`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -200,7 +251,7 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
     .stack-row { display: block !important; }
     .stack, .stack-table { width: 100% !important; max-width: 100% !important; display: block !important; }
     .stack-gap { display: none !important; width: 0 !important; }
-    .hero-img, .full-img { width: 100% !important; max-width: 100% !important; height: auto !important; }
+    .hero-img, .full-img, .showcase-img { width: 100% !important; max-width: 100% !important; height: auto !important; }
   }
 </style>
 </head>
@@ -221,7 +272,7 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
 
         <!-- Hero -->
         <tr>
-          <td style="padding:0 0 0 0;">
+          <td style="padding:0;">
             ${placeholderBlock("hero", "HERO IMAGE", 420)}
           </td>
         </tr>
@@ -236,7 +287,7 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
           </td>
         </tr>
 
-        <!-- Stats Strip -->
+        <!-- Stats Strip (curated totals) -->
         <tr>
           <td align="center" style="padding:28px 20px 36px 20px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -245,7 +296,7 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
           </td>
         </tr>
 
-        <!-- Collection Header -->
+        <!-- Curated Intro -->
         <tr>
           <td align="center" style="padding:16px 20px 8px 20px;border-top:1px solid ${P.charcoal};">
             <div style="font-family:${F.serif};font-size:22px;font-weight:300;color:${P.white};letter-spacing:1px;margin-top:32px;margin-bottom:8px;">${esc(copy.collectionIntroLabel)}</div>
@@ -253,19 +304,21 @@ export function buildDraftHtml({ products, copy, totalZar }: BuildDraftArgs): st
           </td>
         </tr>
 
-        <!-- Product Showcase -->
-        ${productShowcase}
+        <!-- Curated Grid -->
+        ${curatedGrid}
 
-        <!-- Complete The Look Banner -->
+        <!-- Shop The Collection Banner -->
         <tr>
           <td style="padding:12px 0 12px 0;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${P.charcoal};">
               <tr><td align="center" style="padding:48px 20px 20px 20px;font-family:${F.sans};font-size:10px;font-weight:500;letter-spacing:4px;text-transform:uppercase;color:${P.gold};">${esc(copy.completeTheLookLine)}</td></tr>
-              <tr><td align="center" style="padding:0 20px 28px 20px;font-family:${F.serif};font-size:44px;font-weight:300;color:${P.gold};letter-spacing:2px;">${formatZar(totalZar)}</td></tr>
+              <tr><td align="center" style="padding:0 20px 28px 20px;font-family:${F.serif};font-size:44px;font-weight:300;color:${P.gold};letter-spacing:2px;">${formatZar(curatedTotalZar)}</td></tr>
               <tr><td align="center" style="padding:0 20px 48px 20px;"><a href="${C.whatsapp}" style="display:inline-block;padding:14px 32px;background-color:${P.gold};color:${P.black};font-family:${F.sans};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;text-decoration:none;border-radius:2px;">Shop The Collection</a></td></tr>
             </table>
           </td>
         </tr>
+
+        ${alsoAvailable}
 
         <!-- Brand Promise -->
         <tr>
@@ -310,7 +363,12 @@ export function swapPlaceholders(html: string, urls: SlotUrlMap, slots: ImageSlo
     const url = urls[slot.id];
     if (!url) continue;
     const alt = slot.productName ? slot.productName : "Link Interiors";
-    const className = slot.layout === "hero" ? "hero-img" : "full-img";
+    const className =
+      slot.layout === "hero"
+        ? "hero-img"
+        : slot.layout === "showcase"
+        ? "showcase-img"
+        : "full-img";
     const imgTag = `<img src="${escAttr(url)}" alt="${escAttr(alt)}" width="${slot.width}" class="${className}" style="display:block;width:100%;max-width:${slot.width}px;height:auto;border:0;outline:none;text-decoration:none;" />`;
     const re = new RegExp(`<!--BEGIN_SLOT:${slot.id}-->[\\s\\S]*?<!--END_SLOT:${slot.id}-->`, "g");
     result = result.replace(re, imgTag);

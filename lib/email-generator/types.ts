@@ -4,6 +4,7 @@ export interface ProductInput {
   productUrl: string;
   description?: string;
   dimensions?: string;
+  curated?: boolean;
 }
 
 export interface CampaignInput {
@@ -23,12 +24,15 @@ export interface AICopy {
   collectionIntroTagline: string;
   productDescriptions: string[];
   completeTheLookLine: string;
+  individualSectionLabel: string;
+  individualSectionTagline: string;
+  individualNarrative: string;
   brandPromise: string;
   finalCtaHeadline: string;
   finalCtaBody: string;
 }
 
-export type SlotLayout = "hero" | "full" | "half";
+export type SlotLayout = "hero" | "full" | "half" | "showcase";
 
 export interface ImageSlot {
   id: string;

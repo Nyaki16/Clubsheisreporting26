@@ -37,6 +37,7 @@ function validate(input: unknown): { ok: true; data: CampaignInput } | { ok: fal
     const productUrl = typeof p.productUrl === "string" ? p.productUrl.trim() : "";
     const description = typeof p.description === "string" ? p.description.trim() : "";
     const dimensions = typeof p.dimensions === "string" ? p.dimensions.trim() : "";
+    const curated = p.curated === undefined || p.curated === null ? true : Boolean(p.curated);
     if (!name) return { ok: false, error: "Product name required" };
     if (!Number.isFinite(priceZar) || priceZar <= 0) {
       return { ok: false, error: `Valid price required for ${name}` };
@@ -50,7 +51,14 @@ function validate(input: unknown): { ok: true; data: CampaignInput } | { ok: fal
       productUrl,
       description: description || undefined,
       dimensions: dimensions || undefined,
+      curated,
     });
+  }
+  if (!products.some((p) => p.curated !== false)) {
+    return {
+      ok: false,
+      error: "At least one product must be part of the curated edit",
+    };
   }
   return { ok: true, data: { campaignDate, theme, products } };
 }
@@ -67,7 +75,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: parsed.error }, { status: 400 });
     }
     const { campaignDate, theme, products } = parsed.data;
-    const totalZar = products.reduce((sum, p) => sum + p.priceZar, 0);
+    const curatedProducts = products.filter((p) => p.curated !== false);
+    const individualProducts = products.filter((p) => p.curated === false);
+    const curatedTotalZar = curatedProducts.reduce((sum, p) => sum + p.priceZar, 0);
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -75,7 +85,14 @@ export async function POST(request: NextRequest) {
     }
     const anthropic = new Anthropic({ apiKey });
 
-    const userPrompt = buildUserPrompt({ theme, campaignDate, products, totalZar });
+    const userPrompt = buildUserPrompt({
+      theme,
+      campaignDate,
+      products,
+      curatedTotalZar,
+      curatedCount: curatedProducts.length,
+      individualCount: individualProducts.length,
+    });
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
@@ -111,18 +128,28 @@ export async function POST(request: NextRequest) {
     }
     if (!Array.isArray(copy.statsStrip) || copy.statsStrip.length !== 3) {
       copy.statsStrip = [
-        `${products.length} Piece${products.length > 1 ? "s" : ""}`,
-        `R ${totalZar.toLocaleString("en-ZA")}`,
+        `${curatedProducts.length} Piece${curatedProducts.length === 1 ? "" : "s"}`,
+        `R ${curatedTotalZar.toLocaleString("en-ZA")}`,
         "Made to Order",
       ];
     }
+    copy.individualSectionLabel = copy.individualSectionLabel || "Also Available";
+    copy.individualSectionTagline = copy.individualSectionTagline || "Handpicked additions";
+    copy.individualNarrative = copy.individualNarrative || "";
 
-    const html = buildDraftHtml({ products, copy, totalZar });
+    const html = buildDraftHtml({ products, copy, curatedTotalZar });
     const slots = planSlots(products);
 
     return Response.json({
       success: true,
-      data: { html, copy, slots, totalZar },
+      data: {
+        html,
+        copy,
+        slots,
+        curatedTotalZar,
+        curatedCount: curatedProducts.length,
+        individualCount: individualProducts.length,
+      },
     });
   } catch (e) {
     console.error("Email generator draft error:", e);

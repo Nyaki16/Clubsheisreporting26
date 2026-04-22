@@ -26,6 +26,7 @@ interface ProductRow {
   productUrl: string;
   description: string;
   dimensions: string;
+  curated: boolean;
 }
 
 const EMPTY_ROW: ProductRow = {
@@ -34,6 +35,7 @@ const EMPTY_ROW: ProductRow = {
   productUrl: "",
   description: "",
   dimensions: "",
+  curated: true,
 };
 
 interface SlotState {
@@ -48,7 +50,9 @@ interface DraftData {
   html: string;
   copy: AICopy;
   slots: ImageSlot[];
-  totalZar: number;
+  curatedTotalZar: number;
+  curatedCount: number;
+  individualCount: number;
 }
 
 async function safeJson(res: Response): Promise<{ error?: string; data?: { url: string; fileId?: string } } | null> {
@@ -64,9 +68,10 @@ async function safeJson(res: Response): Promise<{ error?: string; data?: { url: 
   return { error: text.slice(0, 180) || `HTTP ${res.status}` };
 }
 
-const CSV_TEMPLATE = `name,priceZar,productUrl,description,dimensions
-The Ava,32500,https://linkinterior.co.za/products/the-ava,Sculptural Floor Lamp · Matte Black,H 180cm · W 120cm · D 45cm
-The Noor,18900,https://linkinterior.co.za/products/the-noor,Accent Side Table · Travertine,
+const CSV_TEMPLATE = `name,priceZar,productUrl,description,dimensions,curated
+The Ava,32500,https://linkinterior.co.za/products/the-ava,Sculptural Floor Lamp · Matte Black,H 180cm · W 120cm · D 45cm,true
+The Noor,18900,https://linkinterior.co.za/products/the-noor,Accent Side Table · Travertine,,true
+The Mila,9500,https://linkinterior.co.za/products/the-mila,Ceramic Vase · Ivory,,false
 `;
 
 function detectDelimiter(firstLine: string): string {
@@ -151,6 +156,7 @@ function parseProductsCsv(text: string): { rows: ProductRow[]; errors: string[] 
   const idxUrl = findCol("producturl", "url", "link", "product link");
   const idxDesc = findCol("description", "desc", "short description");
   const idxDims = findCol("dimensions", "size", "dim", "measurements");
+  const idxCurated = findCol("curated", "iscurated", "edit", "incollection");
   if (idxName < 0 || idxPrice < 0 || idxUrl < 0) {
     const foundHeaders = parsed[0].map((h) => h.trim()).filter(Boolean).join(", ") || "(empty)";
     const missing = [
@@ -186,12 +192,19 @@ function parseProductsCsv(text: string): { rows: ProductRow[]; errors: string[] 
       errors.push(`Row ${i + 1}: invalid URL`);
       continue;
     }
+    let curated = true;
+    if (idxCurated >= 0) {
+      const raw = (r[idxCurated] || "").trim().toLowerCase();
+      if (["false", "no", "n", "0", "individual"].includes(raw)) curated = false;
+      else if (["true", "yes", "y", "1", "curated", ""].includes(raw)) curated = true;
+    }
     rows.push({
       name,
       priceZar: String(priceZar),
       productUrl,
       description: idxDesc >= 0 ? (r[idxDesc] || "").trim() : "",
       dimensions: idxDims >= 0 ? (r[idxDims] || "").trim() : "",
+      curated,
     });
   }
   if (rows.length === 0 && errors.length === 0) {
@@ -306,7 +319,17 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           if (saved.form?.campaignDate) setCampaignDate(saved.form.campaignDate);
           if (typeof saved.form?.theme === "string") setTheme(saved.form.theme);
           if (Array.isArray(saved.form?.products) && saved.form.products.length > 0) {
-            setProducts(saved.form.products);
+            const normalized: ProductRow[] = (saved.form.products as Partial<ProductRow>[]).map(
+              (p) => ({
+                name: p.name || "",
+                priceZar: p.priceZar || "",
+                productUrl: p.productUrl || "",
+                description: p.description || "",
+                dimensions: p.dimensions || "",
+                curated: p.curated === undefined ? true : Boolean(p.curated),
+              })
+            );
+            setProducts(normalized);
           }
           if (saved.draft && saved.draft.html) setDraft(saved.draft as DraftData);
           if (saved.slotUrls && typeof saved.slotUrls === "object") {
@@ -342,6 +365,15 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const updateRow = (i: number, patch: Partial<ProductRow>) =>
     setProducts((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
 
+  const curatedCount = products.filter((p) => p.curated !== false).length;
+  const individualCount = products.length - curatedCount;
+  const curatedTotal = products
+    .filter((p) => p.curated !== false)
+    .reduce((sum, p) => sum + (Number(p.priceZar) || 0), 0);
+  const individualTotal = products
+    .filter((p) => p.curated === false)
+    .reduce((sum, p) => sum + (Number(p.priceZar) || 0), 0);
+
   const canSubmit =
     products.length > 0 &&
     products.every(
@@ -349,7 +381,8 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         p.name.trim() &&
         p.productUrl.trim() &&
         Number(p.priceZar) > 0
-    );
+    ) &&
+    curatedCount > 0;
 
   const handleGenerateDraft = useCallback(async () => {
     setDraftError(null);
@@ -367,6 +400,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         productUrl: p.productUrl.trim(),
         description: p.description.trim() || undefined,
         dimensions: p.dimensions.trim() || undefined,
+        curated: p.curated !== false,
       })),
     };
 
@@ -765,10 +799,27 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
                 key={i}
                 className="border border-gray-200 rounded-lg p-4 bg-gray-50"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-gray-600">
-                    Product {i + 1}
-                  </span>
+                <div className="flex items-center justify-between mb-3 gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs font-medium text-gray-600">
+                      Product {i + 1}
+                    </span>
+                    <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={p.curated !== false}
+                        onChange={(e) => updateRow(i, { curated: e.target.checked })}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-[#4A1942] focus:ring-[#4A1942] focus:ring-offset-0"
+                      />
+                      <span
+                        className={
+                          p.curated !== false ? "text-[#4A1942]" : "text-gray-500"
+                        }
+                      >
+                        {p.curated !== false ? "Part of curated edit" : "Also available"}
+                      </span>
+                    </label>
+                  </div>
                   {products.length > 1 && (
                     <button
                       onClick={() => removeRow(i)}
@@ -833,12 +884,24 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-gray-500">
-            {products.length} product{products.length === 1 ? "" : "s"} · Total R{" "}
-            {products
-              .reduce((sum, p) => sum + (Number(p.priceZar) || 0), 0)
-              .toLocaleString("en-ZA")}
+        <div className="flex items-center justify-between pt-2 gap-3 flex-wrap">
+          <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-[#4A1942]">
+              {curatedCount} curated · R {curatedTotal.toLocaleString("en-ZA")}
+            </span>
+            {individualCount > 0 && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span>
+                  {individualCount} also available · R {individualTotal.toLocaleString("en-ZA")}
+                </span>
+              </>
+            )}
+            {curatedCount === 0 && products.length > 0 && (
+              <span className="text-amber-600 ml-2">
+                At least one product must be part of the curated edit
+              </span>
+            )}
           </div>
           <button
             onClick={handleGenerateDraft}
