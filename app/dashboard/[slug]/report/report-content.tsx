@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Download, ArrowLeft, Sparkles } from "lucide-react";
+import { Download, ArrowLeft, Sparkles, Send, Copy, Check, Mail, Globe, Loader2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
@@ -31,6 +31,92 @@ export function ReportContent({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [reportInsights, setReportInsights] = useState<ReportInsights | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareData, setShareData] = useState<{ loginUrl: string; directUrl: string; password: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [exportingHtml, setExportingHtml] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
+
+  function copyText(text: string, field: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  async function loadShareData() {
+    const res = await fetch("/api/client-access");
+    if (!res.ok) return;
+    const data = await res.json();
+    const match = data.clients?.find((c: { slug: string }) => c.slug === slug);
+    if (match) {
+      const base = window.location.origin;
+      setShareData({
+        loginUrl: `${base}/login?client=${slug}`,
+        directUrl: `${base}/login?client=${slug}&token=${match.shareToken}`,
+        password: match.password,
+      });
+    }
+    setShowShareModal(true);
+  }
+
+  function getEmailBody() {
+    if (!shareData || !client || !period) return "";
+    return `Hi ${client.name.split(" ")[0]},
+
+Your ${period.label} performance report is ready to view on your Club She Is reporting dashboard.
+
+Here's how to access it:
+
+1. Go to: ${shareData.loginUrl}
+2. Password: ${shareData.password}
+
+You'll find your complete performance breakdown including revenue, social media, ads, and strategic recommendations.
+
+If you have any questions about the report, just reply to this email.
+
+Warm regards,
+Club She Is Team`;
+  }
+
+  async function handleExportHtml() {
+    if (!client || !period) return;
+    setExportingHtml(true);
+    try {
+      const res = await fetch("/api/export-html", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: client.id, periodId: period.id }),
+      });
+      if (!res.ok) {
+        alert("Failed to generate HTML report link");
+        setExportingHtml(false);
+        return;
+      }
+      const result = await res.json();
+      setExportUrl(result.url);
+      setShowExportModal(true);
+    } catch (e) {
+      alert("Error: " + String(e));
+    }
+    setExportingHtml(false);
+  }
+
+  function getExportEmailBody() {
+    if (!exportUrl || !client || !period) return "";
+    return `Hi ${client.name.split(" ")[0]},
+
+Your ${period.label} performance report is ready. You can view it directly in your browser using the link below — no login required.
+
+View your report: ${exportUrl}
+
+This report covers your complete monthly performance including revenue, social media, ads, email marketing, and strategic recommendations for the month ahead.
+
+If you have any questions or would like to discuss anything in the report, just reply to this email and we'll set up a call.
+
+Warm regards,
+Club She Is Team`;
+  }
 
   const loadData = useCallback(async () => {
     const { data: c } = await supabase.from("clients").select("id, name").eq("slug", slug).single();
@@ -130,6 +216,20 @@ export function ReportContent({ slug }: { slug: string }) {
           >
             <Sparkles size={16} className={generating ? "animate-spin" : ""} />
             {generating ? "Generating insights... this may take up to 60 seconds" : reportInsights ? "Regenerate Insights" : "Generate Insights"}
+          </button>
+          <button
+            onClick={loadShareData}
+            className="flex items-center gap-2 px-4 py-2 border border-[#4A1942] text-[#4A1942] font-medium text-sm rounded-lg hover:bg-[#4A1942]/5"
+          >
+            <Send size={16} /> Share with Client
+          </button>
+          <button
+            onClick={handleExportHtml}
+            disabled={exportingHtml}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4A1942] to-[#8B3A62] text-white font-medium text-sm rounded-lg hover:from-[#3a1335] hover:to-[#7a3356] disabled:opacity-50"
+          >
+            {exportingHtml ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
+            {exportingHtml ? "Generating..." : "Export HTML"}
           </button>
           <button
             onClick={handlePrint}
@@ -342,11 +442,11 @@ export function ReportContent({ slug }: { slug: string }) {
                     {meta.campaigns.map((c, i) => (
                       <tr key={i} className="border-b border-gray-100">
                         <td className="py-2 text-gray-900">{c.name}</td>
-                        <td className="py-2 text-right">R{c.spend.toLocaleString()}</td>
-                        <td className="py-2 text-right">{c.impressions.toLocaleString()}</td>
-                        <td className="py-2 text-right">{c.clicks.toLocaleString()}</td>
-                        <td className="py-2 text-right">{c.ctr}</td>
-                        <td className="py-2 text-right">{c.cpc}</td>
+                        <td className="py-2 text-right">R{(c.spend ?? 0).toLocaleString()}</td>
+                        <td className="py-2 text-right">{(c.impressions ?? 0).toLocaleString()}</td>
+                        <td className="py-2 text-right">{(c.clicks ?? 0).toLocaleString()}</td>
+                        <td className="py-2 text-right">{c.ctr ?? "—"}</td>
+                        <td className="py-2 text-right">{c.cpc ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -362,9 +462,9 @@ export function ReportContent({ slug }: { slug: string }) {
                   <InsightBlock headline={reportInsights.email.headline} insights={reportInsights.email.insights} recommendation={reportInsights.email.recommendation} />
                 )}
                 <div className="grid grid-cols-4 gap-4 mb-8">
-                  <StatBox label="Emails Sent" value={email.kpis.totalSent.toLocaleString()} sub={`${email.kpis.campaignCount} campaigns`} />
-                  <StatBox label="Delivered" value={email.kpis.totalDelivered.toLocaleString()} />
-                  <StatBox label="Failed" value={email.kpis.totalFailed.toLocaleString()} negative />
+                  <StatBox label="Emails Sent" value={(email.kpis.totalSent ?? 0).toLocaleString()} sub={`${email.kpis.campaignCount ?? 0} campaigns`} />
+                  <StatBox label="Delivered" value={(email.kpis.totalDelivered ?? 0).toLocaleString()} />
+                  <StatBox label="Failed" value={(email.kpis.totalFailed ?? 0).toLocaleString()} negative />
                   <StatBox label="Delivery Rate" value={email.kpis.deliveryRate} />
                 </div>
 
@@ -384,9 +484,9 @@ export function ReportContent({ slug }: { slug: string }) {
                         <tr key={i} className="border-b border-gray-100">
                           <td className="py-1.5 text-gray-600">{c.date}</td>
                           <td className="py-1.5 text-gray-900">{c.name}</td>
-                          <td className="py-1.5 text-right">{c.sent.toLocaleString()}</td>
-                          <td className="py-1.5 text-right">{c.delivered.toLocaleString()}</td>
-                          <td className="py-1.5 text-right">{c.deliveryRate}</td>
+                          <td className="py-1.5 text-right">{(c.sent ?? 0).toLocaleString()}</td>
+                          <td className="py-1.5 text-right">{(c.delivered ?? 0).toLocaleString()}</td>
+                          <td className="py-1.5 text-right">{c.deliveryRate ?? "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -520,6 +620,128 @@ export function ReportContent({ slug }: { slug: string }) {
           <p className="text-white/40 text-xs">www.clubsheis.com</p>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && shareData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 print:hidden" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-serif font-semibold text-gray-900 text-lg">Share Report — {client?.name}</h3>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+
+            {/* Login Link + Password */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-3">
+              <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 font-medium mb-2">Login Link</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-gray-700 flex-1 truncate">{shareData.loginUrl}</code>
+                <button onClick={() => copyText(shareData.loginUrl, "login")} className="p-1.5 rounded hover:bg-gray-200 text-gray-500">
+                  {copiedField === "login" ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                </button>
+              </div>
+              <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 font-medium mt-3 mb-1">Password</p>
+              <div className="flex items-center gap-2">
+                <code className="text-sm font-mono text-gray-900">{shareData.password}</code>
+                <button onClick={() => copyText(shareData.password, "password")} className="p-1.5 rounded hover:bg-gray-200 text-gray-500">
+                  {copiedField === "password" ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Direct Link */}
+            <div className="bg-amber-50 rounded-lg p-4 mb-4">
+              <p className="text-[0.65rem] uppercase tracking-wider text-amber-600 font-medium mb-2">Direct Link (no password needed)</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-gray-700 flex-1 truncate">{shareData.directUrl}</code>
+                <button onClick={() => copyText(shareData.directUrl, "direct")} className="p-1.5 rounded hover:bg-amber-100 text-amber-600">
+                  {copiedField === "direct" ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Email Template */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 font-medium mb-2">Email Template</p>
+              <p className="text-xs text-gray-500 mb-2">Subject: Your {period?.label} Performance Report is Ready</p>
+              <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-white rounded-lg p-3 border border-gray-200">{getEmailBody()}</pre>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyText(getEmailBody(), "email")}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#4A1942] text-white rounded-lg text-sm font-medium hover:bg-[#3a1335]"
+              >
+                {copiedField === "email" ? <Check size={16} /> : <Copy size={16} />}
+                {copiedField === "email" ? "Copied!" : "Copy Email"}
+              </button>
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent(`Your ${period?.label} Performance Report is Ready`);
+                  const body = encodeURIComponent(getEmailBody());
+                  window.open(`mailto:?subject=${subject}&body=${body}`);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                <Mail size={16} /> Open in Mail
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export HTML Modal */}
+      {showExportModal && exportUrl && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 print:hidden" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-serif font-semibold text-gray-900 text-lg">HTML Report Ready — {client?.name}</h3>
+              <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+
+            {/* Report Link */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+              <p className="text-[0.65rem] uppercase tracking-wider text-emerald-600 font-medium mb-2">Shareable Report Link</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-gray-700 flex-1 truncate">{exportUrl}</code>
+                <button onClick={() => copyText(exportUrl, "exportUrl")} className="p-1.5 rounded hover:bg-emerald-100 text-emerald-600">
+                  {copiedField === "exportUrl" ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                </button>
+                <a href={exportUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-emerald-100 text-emerald-600">
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+              <p className="text-[0.6rem] text-emerald-600/70 mt-2">No login required — anyone with this link can view the report.</p>
+            </div>
+
+            {/* Email Template */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 font-medium mb-2">Email Template</p>
+              <p className="text-xs text-gray-500 mb-2">Subject: Your {period?.label} Performance Report is Ready</p>
+              <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-white rounded-lg p-3 border border-gray-200">{getExportEmailBody()}</pre>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyText(getExportEmailBody(), "exportEmail")}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#4A1942] text-white rounded-lg text-sm font-medium hover:bg-[#3a1335]"
+              >
+                {copiedField === "exportEmail" ? <Check size={16} /> : <Copy size={16} />}
+                {copiedField === "exportEmail" ? "Copied!" : "Copy Email"}
+              </button>
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent(`Your ${period?.label} Performance Report is Ready`);
+                  const body = encodeURIComponent(getExportEmailBody());
+                  window.open(`mailto:?subject=${subject}&body=${body}`);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                <Mail size={16} /> Open in Mail
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print Styles */}
       <style jsx global>{`

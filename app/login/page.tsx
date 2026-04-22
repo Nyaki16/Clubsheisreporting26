@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -8,9 +8,35 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientSlug = searchParams.get("client") || "";
+  const token = searchParams.get("token") || "";
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-login if token is present
+  useEffect(() => {
+    if (clientSlug && token) {
+      setLoading(true);
+      fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: clientSlug, token }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.slug) {
+            router.push(`/dashboard/${data.slug}`);
+          } else {
+            setError(data.error || "Invalid or expired link. Please use your password.");
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          setError("Something went wrong. Please try your password.");
+          setLoading(false);
+        });
+    }
+  }, [clientSlug, token, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +61,22 @@ function LoginForm() {
     }
   }
 
+  // Show loading state for auto-login
+  if (clientSlug && token && loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: "linear-gradient(135deg, #4A1942 0%, #8B3A62 50%, #C4956A 100%)" }}
+      >
+        <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-lg text-center">
+          <h1 className="font-serif text-2xl font-bold text-[#4A1942] mb-2">Club She Is.</h1>
+          <p className="text-gray-500 text-sm">Signing you in...</p>
+          <div className="mt-4 w-8 h-8 border-2 border-[#4A1942] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4"
@@ -55,7 +97,6 @@ function LoginForm() {
               value={clientSlug}
               readOnly={!!searchParams.get("client")}
               onChange={(e) => {
-                // Only if no preset client
                 if (!searchParams.get("client")) {
                   const url = new URL(window.location.href);
                   url.searchParams.set("client", e.target.value);

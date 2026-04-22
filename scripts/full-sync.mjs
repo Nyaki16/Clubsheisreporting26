@@ -60,23 +60,73 @@ const data = {
     ww: { jan: 481661, feb: 921554, mar: 2353016 },
   },
 
-  // Meta Ads: { client: { month: { spend, impressions, clicks, reach } } }
+  // Meta Ads: { client: { month: { spend, impressions, clicks, reach, campaigns } } }
   ads: {
-    csi: { jan: null, feb: null, mar: { spend: 4290, imp: 52889, clicks: 3588, reach: 28451, campaigns: [{ name: "Content Day March 2026", spend: 2250 }, { name: "Content Day April 2026", spend: 2041 }] } },
+    csi: { jan: null, feb: null, mar: { spend: 4290, imp: 52889, clicks: 3588, reach: 28451, campaigns: [
+      { name: "Content Day March 2026", spend: 2250, impressions: 38890, clicks: 2889, reach: 23333, ctr: "7.43%", cpc: "R0.78" },
+      { name: "Content Day April 2026", spend: 2041, impressions: 13999, clicks: 699, reach: 5118, ctr: "4.99%", cpc: "R2.92" },
+    ] } },
     awa: {
-      jan: { spend: 8742, imp: 245909, clicks: 10811, reach: 130011 },
-      feb: { spend: 11122, imp: 240301, clicks: 13201, reach: 93825 },
-      mar: { spend: 6340, imp: 130112, clicks: 8227, reach: 55242, campaigns: [{ name: "New Engagement campaign", spend: 3928 }, { name: "New Sales campaign Direct to Web", spend: 2412 }] },
+      jan: { spend: 8742, imp: 245909, clicks: 10811, reach: 130011, campaigns: [
+        { name: "Awa Home Evergreen ads", spend: 2767, impressions: 73960, clicks: 3558, reach: 41117, ctr: "4.81%", cpc: "R0.78" },
+        { name: "New Engagement campaign", spend: 2552, impressions: 79220, clicks: 3825, reach: 43480, ctr: "4.83%", cpc: "R0.67" },
+        { name: "New Sales campaign Direct to Web", spend: 1565, impressions: 24503, clicks: 1902, reach: 10636, ctr: "7.76%", cpc: "R0.82" },
+        { name: "February_Ad Campaign", spend: 1015, impressions: 26278, clicks: 1059, reach: 15552, ctr: "4.03%", cpc: "R0.96" },
+        { name: "Sales Season 10 Dec-10 Jan25", spend: 843, impressions: 41948, clicks: 467, reach: 19226, ctr: "1.11%", cpc: "R1.81" },
+      ] },
+      feb: { spend: 11122, imp: 240301, clicks: 13201, reach: 93825, campaigns: [
+        { name: "New Engagement campaign", spend: 6932, impressions: 175618, clicks: 8906, reach: 68711, ctr: "5.07%", cpc: "R0.78" },
+        { name: "New Sales campaign Direct to Web", spend: 4190, impressions: 64683, clicks: 4295, reach: 25114, ctr: "6.64%", cpc: "R0.98" },
+      ] },
+      mar: { spend: 6340, imp: 130112, clicks: 8227, reach: 55242, campaigns: [
+        { name: "New Engagement campaign", spend: 3928, impressions: 92149, clicks: 5507, reach: 38609, ctr: "5.98%", cpc: "R0.71" },
+        { name: "New Sales campaign Direct to Web", spend: 2412, impressions: 37963, clicks: 2720, reach: 16633, ctr: "7.16%", cpc: "R0.89" },
+      ] },
     },
     link: {
-      jan: { spend: 9238, imp: 141275, clicks: 5450, reach: 58366 },
-      feb: { spend: 12989, imp: 180013, clicks: 7221, reach: 91119 },
-      mar: { spend: 13395, imp: 152700, clicks: 7609, reach: 79876, campaigns: [{ name: "December 2025 Ads", spend: 3883 }, { name: "AirBnB Ad Campaign", spend: 3230 }, { name: "Dining Set Ad Campaign", spend: 3143 }, { name: "February Ads 2026", spend: 3139 }] },
+      jan: { spend: 9238, imp: 141275, clicks: 5450, reach: 58366, campaigns: [
+        { name: "December 2025 Ads", spend: 9238, impressions: 141275, clicks: 5450, reach: 58366, ctr: "3.86%", cpc: "R1.69" },
+      ] },
+      feb: { spend: 12989, imp: 180013, clicks: 7221, reach: 91119, campaigns: [
+        { name: "December 2025 Ads", spend: 8381, impressions: 120596, clicks: 4394, reach: 56787, ctr: "3.64%", cpc: "R1.91" },
+        { name: "February Ads 2026", spend: 1536, impressions: 22479, clicks: 1174, reach: 13685, ctr: "5.22%", cpc: "R1.31" },
+        { name: "Dining Set Ad Campaign", spend: 1537, impressions: 19522, clicks: 950, reach: 10647, ctr: "4.87%", cpc: "R1.62" },
+        { name: "AirBnB Ad Campaign", spend: 1535, impressions: 17416, clicks: 703, reach: 10000, ctr: "4.04%", cpc: "R2.18" },
+      ] },
+      mar: { spend: 13395, imp: 152700, clicks: 7609, reach: 79876, campaigns: [
+        { name: "December 2025 Ads", spend: 3883, impressions: 56856, clicks: 2099, reach: 29513, ctr: "3.69%", cpc: "R1.85" },
+        { name: "AirBnB Ad Campaign", spend: 3230, impressions: 26122, clicks: 1270, reach: 13509, ctr: "4.86%", cpc: "R2.54" },
+        { name: "Dining Set Ad Campaign", spend: 3143, impressions: 32249, clicks: 1821, reach: 15127, ctr: "5.65%", cpc: "R1.73" },
+        { name: "February Ads 2026", spend: 3139, impressions: 37473, clicks: 2419, reach: 21727, ctr: "6.46%", cpc: "R1.30" },
+      ] },
     },
     pal: {
-      jan: { spend: 22647, imp: 1091440, clicks: 26698, reach: 754112 },
-      feb: { spend: 20103, imp: 974182, clicks: 23606, reach: 645752 },
-      mar: { spend: 39160, imp: 1246408, clicks: 28566, reach: 769393, campaigns: [{ name: "Free Speaking Challenge", spend: 10010 }, { name: "Speak to get Promoted", spend: 7752 }, { name: "7 Day Challenge", spend: 7754 }, { name: "Unignorable Presence webinar", spend: 6414 }, { name: "Webinar English", spend: 5049 }, { name: "Brand awareness", spend: 1557 }, { name: "Retarget Confidence to speak", spend: 623 }] },
+      jan: { spend: 22647, imp: 1091440, clicks: 26698, reach: 754112, campaigns: [
+        { name: "Speak to get Promoted", spend: 7151, impressions: 250421, clicks: 10617, reach: 161445, ctr: "4.24%", cpc: "R0.67" },
+        { name: "7 Day Challenge", spend: 7186, impressions: 107223, clicks: 3676, reach: 34237, ctr: "3.43%", cpc: "R1.95" },
+        { name: "Webinar English", spend: 4326, impressions: 127951, clicks: 5994, reach: 53793, ctr: "4.68%", cpc: "R0.72" },
+        { name: "Brand awareness", spend: 1398, impressions: 427299, clicks: 2212, reach: 378161, ctr: "0.52%", cpc: "R0.63" },
+        { name: "Articulate to Get Hired", spend: 1298, impressions: 25732, clicks: 2497, reach: 18750, ctr: "9.70%", cpc: "R0.52" },
+        { name: "Whatsapp for English VN", spend: 719, impressions: 15782, clicks: 876, reach: 10531, ctr: "5.55%", cpc: "R0.82" },
+        { name: "Retarget Confidence to speak", spend: 569, impressions: 137032, clicks: 826, reach: 97195, ctr: "0.60%", cpc: "R0.69" },
+      ] },
+      feb: { spend: 20103, imp: 974182, clicks: 23606, reach: 645752, campaigns: [
+        { name: "Speak to get Promoted", spend: 6996, impressions: 206776, clicks: 9583, reach: 126524, ctr: "4.63%", cpc: "R0.73" },
+        { name: "7 Day Challenge", spend: 6958, impressions: 106083, clicks: 3320, reach: 33922, ctr: "3.13%", cpc: "R2.10" },
+        { name: "Webinar English", spend: 3992, impressions: 129398, clicks: 6116, reach: 55955, ctr: "4.73%", cpc: "R0.65" },
+        { name: "Brand awareness", spend: 1399, impressions: 423410, clicks: 3922, reach: 352162, ctr: "0.93%", cpc: "R0.36" },
+        { name: "Retarget Confidence to speak", spend: 560, impressions: 106179, clicks: 593, reach: 75694, ctr: "0.56%", cpc: "R0.94" },
+        { name: "Whatsapp for English VN", spend: 198, impressions: 2336, clicks: 72, reach: 1495, ctr: "3.08%", cpc: "R2.74" },
+      ] },
+      mar: { spend: 39160, imp: 1246408, clicks: 28566, reach: 769393, campaigns: [
+        { name: "Free Speaking Challenge", spend: 10010, impressions: 254793, clicks: 5492, reach: 93999, ctr: "2.16%", cpc: "R1.82" },
+        { name: "7 Day Challenge", spend: 7754, impressions: 106008, clicks: 3347, reach: 41312, ctr: "3.16%", cpc: "R2.32" },
+        { name: "Speak to get Promoted", spend: 7752, impressions: 209414, clicks: 9336, reach: 115513, ctr: "4.46%", cpc: "R0.83" },
+        { name: "Unignorable Presence webinar", spend: 6414, impressions: 61369, clicks: 3684, reach: 24911, ctr: "6.00%", cpc: "R1.74" },
+        { name: "Webinar English", spend: 5049, impressions: 60843, clicks: 2268, reach: 26067, ctr: "3.73%", cpc: "R2.23" },
+        { name: "Brand awareness", spend: 1557, impressions: 437248, clicks: 3709, reach: 384527, ctr: "0.85%", cpc: "R0.42" },
+        { name: "Retarget Confidence to speak", spend: 623, impressions: 116733, clicks: 730, reach: 83064, ctr: "0.63%", cpc: "R0.85" },
+      ] },
     },
     ww: { jan: null, feb: null, mar: null },
   },

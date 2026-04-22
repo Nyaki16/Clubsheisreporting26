@@ -21,6 +21,29 @@ export function DashboardShell({ slug, children }: Props) {
   const [currentPeriodId, setCurrentPeriodId] = useState("");
   const [periods, setPeriods] = useState<{ id: string; label: string }[]>([]);
   const [clients, setClients] = useState<{ slug: string; name: string }[]>([]);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Auth check: clients can only access their own dashboard
+  useEffect(() => {
+    fetch("/api/auth/verify")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.role === "admin") {
+          setIsAdmin(true);
+          setAuthChecked(true);
+        } else if (data.role === "client") {
+          if (data.slug !== slug) {
+            router.replace(`/dashboard/${data.slug}`);
+            return;
+          }
+          setAuthChecked(true);
+        } else {
+          router.replace(`/login?client=${slug}`);
+        }
+      })
+      .catch(() => router.replace(`/login?client=${slug}`));
+  }, [slug, router]);
 
   const loadData = useCallback(async () => {
     const [clientRes, periodsRes, clientsRes] = await Promise.all([
@@ -46,8 +69,16 @@ export function DashboardShell({ slug, children }: Props) {
   }, [slug, searchParams]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (authChecked) loadData();
+  }, [loadData, authChecked]);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAF7F2" }}>
+        <div className="w-8 h-8 border-2 border-[#4A1942] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FAF7F2" }}>
@@ -56,7 +87,7 @@ export function DashboardShell({ slug, children }: Props) {
         slug={slug}
         periodLabel={periodLabel}
         periods={periods}
-        clients={clients}
+        clients={isAdmin ? clients : []}
         currentPeriodId={currentPeriodId}
         onPeriodChange={(id) => {
           setCurrentPeriodId(id);

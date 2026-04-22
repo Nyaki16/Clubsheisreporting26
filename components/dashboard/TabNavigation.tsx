@@ -22,6 +22,9 @@ export function TabNavigation({ slug }: { slug: string }) {
     { label: "CRM (Ghutte)", href: `${base}/crm` },
     { label: "Social Media", href: `${base}/social` },
     { label: "Email", href: `${base}/email` },
+    ...(slug === "link-interiors"
+      ? [{ label: "Email Generator", href: `${base}/email-generator` }]
+      : []),
     { label: "Wins & Insights", href: `${base}/insights` },
     { label: "Next Month", href: `${base}/next-month` },
     { label: "Strategy Notes", href: `${base}/notes` },

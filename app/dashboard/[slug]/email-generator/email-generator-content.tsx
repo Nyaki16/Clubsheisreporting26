@@ -1,0 +1,670 @@
+"use client";
+
+import { useState, useCallback, useMemo } from "react";
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  Copy as CopyIcon,
+  Download,
+  Sparkles,
+  Check,
+  X,
+  Upload,
+  Image as ImageIcon,
+} from "lucide-react";
+import { swapPlaceholders } from "@/lib/email-generator/html-builder";
+import type { AICopy, ImageSlot, SlotUrlMap } from "@/lib/email-generator/types";
+
+const ACCESS_SLUG = "link-interiors";
+
+interface ProductRow {
+  name: string;
+  priceZar: string;
+  productUrl: string;
+  description: string;
+  dimensions: string;
+}
+
+const EMPTY_ROW: ProductRow = {
+  name: "",
+  priceZar: "",
+  productUrl: "",
+  description: "",
+  dimensions: "",
+};
+
+interface SlotState {
+  uploading: boolean;
+  url?: string;
+  fileName?: string;
+  error?: string;
+  previewDataUrl?: string;
+}
+
+interface DraftData {
+  html: string;
+  copy: AICopy;
+  slots: ImageSlot[];
+  totalZar: number;
+}
+
+export function EmailGeneratorContent({ slug }: { slug: string }) {
+  const [campaignDate, setCampaignDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [theme, setTheme] = useState("");
+  const [products, setProducts] = useState<ProductRow[]>([{ ...EMPTY_ROW }]);
+
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<DraftData | null>(null);
+
+  const [slotStates, setSlotStates] = useState<Record<string, SlotState>>({});
+  const [finalHtml, setFinalHtml] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copiedSubject, setCopiedSubject] = useState(false);
+
+  const addRow = () => setProducts((ps) => [...ps, { ...EMPTY_ROW }]);
+  const removeRow = (i: number) =>
+    setProducts((ps) => ps.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, patch: Partial<ProductRow>) =>
+    setProducts((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+
+  const canSubmit =
+    products.length > 0 &&
+    products.every(
+      (p) =>
+        p.name.trim() &&
+        p.productUrl.trim() &&
+        Number(p.priceZar) > 0
+    );
+
+  const handleGenerateDraft = useCallback(async () => {
+    setDraftError(null);
+    setDraftLoading(true);
+    setDraft(null);
+    setSlotStates({});
+    setFinalHtml(null);
+
+    const payload = {
+      campaignDate,
+      theme: theme.trim(),
+      products: products.map((p) => ({
+        name: p.name.trim(),
+        priceZar: Number(p.priceZar) || 0,
+        productUrl: p.productUrl.trim(),
+        description: p.description.trim() || undefined,
+        dimensions: p.dimensions.trim() || undefined,
+      })),
+    };
+
+    try {
+      const res = await fetch("/api/email-generator/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setDraftError(result.error || "Failed to generate draft");
+      } else {
+        setDraft(result.data as DraftData);
+      }
+    } catch (e) {
+      setDraftError(String(e));
+    } finally {
+      setDraftLoading(false);
+    }
+  }, [campaignDate, theme, products]);
+
+  const handleFileForSlot = useCallback(
+    async (slotId: string, file: File) => {
+      if (!draft) return;
+      const slot = draft.slots.find((s) => s.id === slotId);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSlotStates((s) => ({
+          ...s,
+          [slotId]: {
+            uploading: true,
+            previewDataUrl: reader.result as string,
+          },
+        }));
+      };
+      reader.readAsDataURL(file);
+
+      const form = new FormData();
+      form.append("file", file);
+      form.append("slotId", slotId);
+      form.append("campaignDate", campaignDate);
+      if (slot?.productName) form.append("productName", slot.productName);
+
+      try {
+        const res = await fetch("/api/email-generator/upload-image", {
+          method: "POST",
+          body: form,
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          setSlotStates((s) => ({
+            ...s,
+            [slotId]: {
+              uploading: false,
+              error: result.error || "Upload failed",
+              previewDataUrl: s[slotId]?.previewDataUrl,
+            },
+          }));
+          return;
+        }
+        setSlotStates((s) => ({
+          ...s,
+          [slotId]: {
+            uploading: false,
+            url: result.data.url,
+            fileName: file.name,
+            previewDataUrl: s[slotId]?.previewDataUrl,
+          },
+        }));
+      } catch (e) {
+        setSlotStates((s) => ({
+          ...s,
+          [slotId]: {
+            uploading: false,
+            error: String(e),
+          },
+        }));
+      }
+      setFinalHtml(null);
+    },
+    [draft, campaignDate]
+  );
+
+  const allUploaded = useMemo(() => {
+    if (!draft) return false;
+    return draft.slots.every((s) => slotStates[s.id]?.url);
+  }, [draft, slotStates]);
+
+  const handleGenerateFinal = useCallback(() => {
+    if (!draft) return;
+    const urls: SlotUrlMap = {};
+    for (const slot of draft.slots) {
+      const url = slotStates[slot.id]?.url;
+      if (url) urls[slot.id] = url;
+    }
+    const finalDoc = swapPlaceholders(draft.html, urls, draft.slots);
+    setFinalHtml(finalDoc);
+  }, [draft, slotStates]);
+
+  const handleCopyFinal = useCallback(async () => {
+    if (!finalHtml) return;
+    await navigator.clipboard.writeText(finalHtml);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [finalHtml]);
+
+  const handleCopySubject = useCallback(async () => {
+    if (!draft) return;
+    await navigator.clipboard.writeText(draft.copy.subjectLine);
+    setCopiedSubject(true);
+    setTimeout(() => setCopiedSubject(false), 1500);
+  }, [draft]);
+
+  const handleDownload = useCallback(() => {
+    if (!finalHtml) return;
+    const blob = new Blob([finalHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `link-interiors-${campaignDate}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [finalHtml, campaignDate]);
+
+  if (slug !== ACCESS_SLUG) {
+    return (
+      <div className="space-y-4">
+        <h2 className="font-serif text-xl font-semibold text-gray-900">Email Generator</h2>
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <p className="text-sm text-gray-600">
+            This tool is only available for Link Interiors.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="font-serif text-xl font-semibold text-gray-900">
+          Email Generator
+        </h2>
+        <p className="text-sm text-gray-500">
+          Weekly product email for Link Interiors — AI-drafted copy, branded template, images uploaded straight to the GHL media library.
+        </p>
+      </div>
+
+      {/* 1. Campaign inputs */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">1. Campaign details</h3>
+          <span className="text-xs text-gray-500">Step 1 of 3</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Campaign date
+            </label>
+            <input
+              type="date"
+              value={campaignDate}
+              onChange={(e) => setCampaignDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Theme <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              placeholder="e.g. Autumn Arrivals, Weekend Sale, The Lighting Edit"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+            />
+          </div>
+        </div>
+
+        {/* Products */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-700">
+              Products
+            </label>
+            <button
+              onClick={addRow}
+              type="button"
+              className="flex items-center gap-1 text-xs font-medium text-[#4A1942] hover:text-[#3a1335]"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add product
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {products.map((p, i) => (
+              <div
+                key={i}
+                className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-gray-600">
+                    Product {i + 1}
+                  </span>
+                  {products.length > 1 && (
+                    <button
+                      onClick={() => removeRow(i)}
+                      type="button"
+                      className="text-gray-400 hover:text-red-600"
+                      aria-label="Remove product"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      value={p.name}
+                      onChange={(e) => updateRow(i, { name: e.target.value })}
+                      placeholder="Product name (e.g. The Ava)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      value={p.priceZar}
+                      onChange={(e) => updateRow(i, { priceZar: e.target.value })}
+                      placeholder="Price (ZAR, e.g. 32500)"
+                      min={0}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="url"
+                      value={p.productUrl}
+                      onChange={(e) => updateRow(i, { productUrl: e.target.value })}
+                      placeholder="Product URL (https://linkinterior.co.za/...)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={p.description}
+                      onChange={(e) => updateRow(i, { description: e.target.value })}
+                      placeholder="Description hint (optional)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={p.dimensions}
+                      onChange={(e) => updateRow(i, { dimensions: e.target.value })}
+                      placeholder="Dimensions, optional (H 180cm · W 120cm)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <div className="text-xs text-gray-500">
+            {products.length} product{products.length === 1 ? "" : "s"} · Total R{" "}
+            {products
+              .reduce((sum, p) => sum + (Number(p.priceZar) || 0), 0)
+              .toLocaleString("en-ZA")}
+          </div>
+          <button
+            onClick={handleGenerateDraft}
+            disabled={!canSubmit || draftLoading}
+            className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#3a1335] px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {draftLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            {draftLoading ? "Drafting..." : "Generate draft"}
+          </button>
+        </div>
+
+        {draftError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+            {draftError}
+          </div>
+        )}
+      </section>
+
+      {/* 2. Draft preview + image slots */}
+      {draft && (
+        <>
+          <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">
+                2. Draft preview & subject line
+              </h3>
+              <span className="text-xs text-gray-500">Step 2 of 3</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2 space-y-1">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Subject line
+                </div>
+                <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {draft.copy.subjectLine}
+                  </div>
+                  <button
+                    onClick={handleCopySubject}
+                    className="flex-shrink-0 text-gray-500 hover:text-gray-900"
+                    aria-label="Copy subject"
+                  >
+                    {copiedSubject ? (
+                      <Check className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <CopyIcon className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Preheader
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 truncate">
+                  {draft.copy.preheader}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Preview (with placeholder image boxes)
+              </div>
+              <iframe
+                srcDoc={draft.html}
+                title="Email draft preview"
+                className="w-full rounded-lg border border-gray-200"
+                style={{ height: "600px", backgroundColor: "#0A0A0A" }}
+                sandbox=""
+              />
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">
+                3. Drop polished images
+              </h3>
+              <span className="text-xs text-gray-500">Step 3 of 3</span>
+            </div>
+            <p className="text-sm text-gray-600 -mt-2">
+              Drag and drop one image per slot. Each uploads to the Link Interiors GHL media library immediately — the hosted URL is used in the final email HTML.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {draft.slots.map((slot) => (
+                <SlotTile
+                  key={slot.id}
+                  slot={slot}
+                  state={slotStates[slot.id]}
+                  onFile={(f) => handleFileForSlot(slot.id, f)}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-xs text-gray-500">
+                {
+                  Object.values(slotStates).filter((s) => s?.url).length
+                }{" "}
+                of {draft.slots.length} image
+                {draft.slots.length === 1 ? "" : "s"} uploaded
+              </div>
+              <button
+                onClick={handleGenerateFinal}
+                disabled={!allUploaded}
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#3a1335] px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Generate final HTML
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* 3. Final output */}
+      {finalHtml && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">Final HTML</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyFinal}
+                className="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <CopyIcon className="w-3.5 h-3.5" /> Copy HTML
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#4A1942] hover:bg-[#3a1335] px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Download .html
+              </button>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-600">
+            Paste into GoHighLevel's <strong>Custom HTML</strong> email block and send. All images are already hosted on your GHL CDN.
+          </p>
+
+          <iframe
+            srcDoc={finalHtml}
+            title="Final email preview"
+            className="w-full rounded-lg border border-gray-200"
+            style={{ height: "720px", backgroundColor: "#0A0A0A" }}
+            sandbox=""
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function SlotTile({
+  slot,
+  state,
+  onFile,
+}: {
+  slot: ImageSlot;
+  state?: SlotState;
+  onFile: (f: File) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLLabelElement>) => {
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file && file.type.startsWith("image/")) onFile(file);
+    },
+    [onFile]
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) onFile(file);
+      e.target.value = "";
+    },
+    [onFile]
+  );
+
+  const label =
+    slot.layout === "hero"
+      ? "Hero image"
+      : slot.productName || `Product ${(slot.productIndex ?? 0) + 1}`;
+
+  const layoutLabel =
+    slot.layout === "hero"
+      ? "600×420"
+      : slot.layout === "full"
+      ? "570×400"
+      : "270×260";
+
+  const hasPreview = !!state?.previewDataUrl || !!state?.url;
+  const showImg = state?.previewDataUrl || state?.url;
+
+  return (
+    <label
+      htmlFor={`file-${slot.id}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+      className={`relative block cursor-pointer rounded-lg overflow-hidden border-2 transition-colors ${
+        dragging
+          ? "border-[#4A1942] bg-[#4A1942]/5"
+          : state?.error
+          ? "border-red-300 bg-red-50"
+          : state?.url
+          ? "border-emerald-300 bg-white"
+          : "border-dashed border-gray-300 bg-gray-50 hover:border-gray-400"
+      }`}
+    >
+      <input
+        id={`file-${slot.id}`}
+        type="file"
+        accept="image/*"
+        onChange={handleChange}
+        className="sr-only"
+      />
+      <div className="aspect-[4/3] relative flex items-center justify-center bg-gray-900">
+        {hasPreview && showImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={showImg}
+            alt={label}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="flex flex-col items-center text-gray-400">
+            <ImageIcon className="w-8 h-8 mb-1" />
+            <span className="text-xs">Drop image</span>
+          </div>
+        )}
+        {state?.uploading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs">
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            Uploading…
+          </div>
+        )}
+        {state?.url && !state.uploading && (
+          <div className="absolute top-2 right-2 bg-emerald-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow">
+            <Check className="w-3.5 h-3.5" />
+          </div>
+        )}
+      </div>
+      <div className="p-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-gray-900 truncate">
+            {label}
+          </div>
+          <div className="text-[11px] text-gray-500 flex items-center gap-1.5 mt-0.5">
+            <span>{layoutLabel}</span>
+            {state?.fileName && (
+              <>
+                <span>·</span>
+                <span className="truncate">{state.fileName}</span>
+              </>
+            )}
+          </div>
+          {state?.error && (
+            <div className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+              <X className="w-3 h-3" /> {state.error}
+            </div>
+          )}
+        </div>
+        {!state?.url && !state?.uploading && (
+          <Upload className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+        )}
+      </div>
+    </label>
+  );
+}
