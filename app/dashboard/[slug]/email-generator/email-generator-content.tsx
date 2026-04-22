@@ -49,6 +49,56 @@ interface DraftData {
   totalZar: number;
 }
 
+async function safeJson(res: Response): Promise<{ error?: string; data?: { url: string; fileId?: string } } | null> {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+  const text = await res.text().catch(() => "");
+  return { error: text.slice(0, 180) || `HTTP ${res.status}` };
+}
+
+async function resizeImageIfNeeded(
+  file: File,
+  maxEdge: number,
+  quality: number
+): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read image"));
+      el.src = url;
+    });
+    const longest = Math.max(img.naturalWidth, img.naturalHeight);
+    const smallEnough = file.size < 3.5 * 1024 * 1024;
+    if (longest <= maxEdge && smallEnough) return file;
+    const scale = Math.min(1, maxEdge / longest);
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality)
+    );
+    if (!blob) return file;
+    const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], newName, { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function EmailGeneratorContent({ slug }: { slug: string }) {
   const [campaignDate, setCampaignDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
@@ -135,8 +185,15 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
       };
       reader.readAsDataURL(file);
 
+      let upload: File = file;
+      try {
+        upload = await resizeImageIfNeeded(file, 1800, 0.88);
+      } catch {
+        // fall through with original file; server will reject if too large
+      }
+
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", upload);
       form.append("slotId", slotId);
       form.append("campaignDate", campaignDate);
       if (slot?.productName) form.append("productName", slot.productName);
@@ -146,13 +203,28 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           method: "POST",
           body: form,
         });
-        const result = await res.json();
+        const result = await safeJson(res);
         if (!res.ok) {
+          const msg =
+            res.status === 413
+              ? "File still too large after resizing. Try a smaller source image."
+              : result?.error || `Upload failed (HTTP ${res.status})`;
           setSlotStates((s) => ({
             ...s,
             [slotId]: {
               uploading: false,
-              error: result.error || "Upload failed",
+              error: msg,
+              previewDataUrl: s[slotId]?.previewDataUrl,
+            },
+          }));
+          return;
+        }
+        if (!result?.data?.url) {
+          setSlotStates((s) => ({
+            ...s,
+            [slotId]: {
+              uploading: false,
+              error: "Upload succeeded but no URL returned",
               previewDataUrl: s[slotId]?.previewDataUrl,
             },
           }));
@@ -162,7 +234,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           ...s,
           [slotId]: {
             uploading: false,
-            url: result.data.url,
+            url: result.data!.url,
             fileName: file.name,
             previewDataUrl: s[slotId]?.previewDataUrl,
           },
