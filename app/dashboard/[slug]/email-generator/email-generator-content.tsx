@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import {
   Plus,
   Trash2,
@@ -15,9 +15,12 @@ import {
   Save,
   RefreshCw,
   Wand2,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
 } from "lucide-react";
-import { swapPlaceholders } from "@/lib/email-generator/html-builder";
-import type { AICopy, ImageSlot, SlotUrlMap } from "@/lib/email-generator/types";
+import { buildDraftHtml, swapPlaceholders } from "@/lib/email-generator/html-builder";
+import type { AICopy, ImageSlot, ProductInput, SlotUrlMap } from "@/lib/email-generator/types";
 import { LookbookSection, type LookbookSavedState } from "./lookbook-section";
 
 const ACCESS_SLUG = "link-interiors";
@@ -313,6 +316,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const [themeError, setThemeError] = useState<string | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
   const [lookbookState, setLookbookState] = useState<LookbookSavedState | null>(null);
+  const [editingEmailCopy, setEditingEmailCopy] = useState(false);
   const loadedOnce = useRef(false);
 
   useEffect(() => {
@@ -540,6 +544,62 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     const finalDoc = swapPlaceholders(draft.html, urls, draft.slots);
     setFinalHtml(finalDoc);
   }, [draft, slotStates]);
+
+  const updateCopy = useCallback(
+    (patch: Partial<AICopy>) => {
+      setDraft((d) => {
+        if (!d) return d;
+        const newCopy = { ...d.copy, ...patch };
+        const productInputs: ProductInput[] = products.map((p) => ({
+          name: p.name.trim(),
+          priceZar: Number(p.priceZar) || 0,
+          productUrl: p.productUrl.trim(),
+          description: p.description.trim() || undefined,
+          dimensions: p.dimensions.trim() || undefined,
+          curated: p.curated !== false,
+        }));
+        const newHtml = buildDraftHtml({
+          products: productInputs,
+          copy: newCopy,
+          curatedTotalZar: d.curatedTotalZar,
+        });
+        if (finalHtml) {
+          const urls: SlotUrlMap = {};
+          for (const slot of d.slots) {
+            const url = slotStates[slot.id]?.url;
+            if (url) urls[slot.id] = url;
+          }
+          setFinalHtml(swapPlaceholders(newHtml, urls, d.slots));
+        }
+        return { ...d, copy: newCopy, html: newHtml };
+      });
+    },
+    [products, slotStates, finalHtml]
+  );
+
+  const updateStat = useCallback(
+    (idx: 0 | 1 | 2, value: string) => {
+      if (!draft) return;
+      const stats: [string, string, string] = [
+        draft.copy.statsStrip[0],
+        draft.copy.statsStrip[1],
+        draft.copy.statsStrip[2],
+      ];
+      stats[idx] = value;
+      updateCopy({ statsStrip: stats });
+    },
+    [draft, updateCopy]
+  );
+
+  const updateProductDescription = useCallback(
+    (idx: number, value: string) => {
+      if (!draft) return;
+      const descs = [...draft.copy.productDescriptions];
+      descs[idx] = value;
+      updateCopy({ productDescriptions: descs });
+    },
+    [draft, updateCopy]
+  );
 
   const handleCopyFinal = useCallback(async () => {
     if (!finalHtml) return;
@@ -1120,6 +1180,159 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
                 sandbox=""
               />
             </div>
+
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setEditingEmailCopy((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 rounded-lg"
+              >
+                <span className="flex items-center gap-2">
+                  {editingEmailCopy ? (
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  )}
+                  <Pencil className="w-3.5 h-3.5 text-[#4A1942]" />
+                  Edit email copy
+                </span>
+                <span className="text-xs text-gray-500">
+                  {editingEmailCopy ? "Changes update the preview live" : ""}
+                </span>
+              </button>
+              {editingEmailCopy && (
+                <div className="px-4 pb-4 space-y-5">
+                  <CopyGroup title="Header">
+                    <CopyField
+                      label="Subject line"
+                      value={draft.copy.subjectLine}
+                      onChange={(v) => updateCopy({ subjectLine: v })}
+                    />
+                    <CopyField
+                      label="Preheader (hidden preview text)"
+                      value={draft.copy.preheader}
+                      onChange={(v) => updateCopy({ preheader: v })}
+                    />
+                  </CopyGroup>
+
+                  <CopyGroup title="Hero">
+                    <CopyField
+                      label="Collection label (uppercase eyebrow)"
+                      value={draft.copy.collectionLabel}
+                      onChange={(v) => updateCopy({ collectionLabel: v })}
+                    />
+                    <CopyField
+                      label="Hero headline"
+                      value={draft.copy.heroHeadline}
+                      onChange={(v) => updateCopy({ heroHeadline: v })}
+                    />
+                    <CopyField
+                      label="Hero subheadline"
+                      value={draft.copy.heroSubheadline}
+                      onChange={(v) => updateCopy({ heroSubheadline: v })}
+                      multiline
+                      rows={2}
+                    />
+                    <CopyField
+                      label="Lead paragraph"
+                      value={draft.copy.leadParagraph}
+                      onChange={(v) => updateCopy({ leadParagraph: v })}
+                      multiline
+                      rows={5}
+                    />
+                  </CopyGroup>
+
+                  <CopyGroup title="Stats strip">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {([0, 1, 2] as const).map((i) => (
+                        <CopyField
+                          key={i}
+                          label={`Stat ${i + 1}`}
+                          value={draft.copy.statsStrip[i] || ""}
+                          onChange={(v) => updateStat(i, v)}
+                        />
+                      ))}
+                    </div>
+                  </CopyGroup>
+
+                  <CopyGroup title="The Curated Edit">
+                    <CopyField
+                      label="Section label"
+                      value={draft.copy.collectionIntroLabel}
+                      onChange={(v) => updateCopy({ collectionIntroLabel: v })}
+                    />
+                    <CopyField
+                      label="Section tagline"
+                      value={draft.copy.collectionIntroTagline}
+                      onChange={(v) => updateCopy({ collectionIntroTagline: v })}
+                    />
+                  </CopyGroup>
+
+                  <CopyGroup title="Product taglines">
+                    <div className="space-y-2">
+                      {products.map((p, i) => (
+                        <CopyField
+                          key={i}
+                          label={p.name || `Product ${i + 1}`}
+                          value={draft.copy.productDescriptions[i] || ""}
+                          onChange={(v) => updateProductDescription(i, v)}
+                        />
+                      ))}
+                    </div>
+                  </CopyGroup>
+
+                  <CopyGroup title="Shop The Collection banner">
+                    <CopyField
+                      label="Above the total price (e.g. 'Dress All Four Rooms From')"
+                      value={draft.copy.completeTheLookLine}
+                      onChange={(v) => updateCopy({ completeTheLookLine: v })}
+                    />
+                  </CopyGroup>
+
+                  <CopyGroup title="Also Available">
+                    <CopyField
+                      label="Section label"
+                      value={draft.copy.individualSectionLabel}
+                      onChange={(v) => updateCopy({ individualSectionLabel: v })}
+                    />
+                    <CopyField
+                      label="Section tagline"
+                      value={draft.copy.individualSectionTagline}
+                      onChange={(v) => updateCopy({ individualSectionTagline: v })}
+                    />
+                    <CopyField
+                      label="Narrative (between first 4 and remaining items)"
+                      value={draft.copy.individualNarrative}
+                      onChange={(v) => updateCopy({ individualNarrative: v })}
+                      multiline
+                      rows={3}
+                    />
+                  </CopyGroup>
+
+                  <CopyGroup title="Footer">
+                    <CopyField
+                      label="Brand promise (italic quote)"
+                      value={draft.copy.brandPromise}
+                      onChange={(v) => updateCopy({ brandPromise: v })}
+                      multiline
+                      rows={3}
+                    />
+                    <CopyField
+                      label="Final CTA headline"
+                      value={draft.copy.finalCtaHeadline}
+                      onChange={(v) => updateCopy({ finalCtaHeadline: v })}
+                    />
+                    <CopyField
+                      label="Final CTA body"
+                      value={draft.copy.finalCtaBody}
+                      onChange={(v) => updateCopy({ finalCtaBody: v })}
+                      multiline
+                      rows={3}
+                    />
+                  </CopyGroup>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
@@ -1231,6 +1444,54 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           })()}
           initialState={lookbookState}
           onStateChange={(s) => setLookbookState(s)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CopyGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+        {title}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function CopyField({
+  label,
+  value,
+  onChange,
+  multiline,
+  rows,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-gray-600 mb-1">
+        {label}
+      </label>
+      {multiline ? (
+        <textarea
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          rows={rows ?? 2}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942] resize-y"
+        />
+      ) : (
+        <input
+          type="text"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942]"
         />
       )}
     </div>

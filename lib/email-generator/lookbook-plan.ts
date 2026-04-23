@@ -26,6 +26,12 @@ export type LookbookPage =
       products: LookbookProduct[];
     }
   | {
+      kind: "feature";
+      imageUrl: string;
+      eyebrow?: string;
+      caption?: string;
+    }
+  | {
       kind: "contact";
       whatsapp: string;
       phone: string;

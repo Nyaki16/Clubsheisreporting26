@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Sparkles, Download, BookOpen } from "lucide-react";
-import { BRAND } from "@/lib/email-generator/brand";
+import { Loader2, Sparkles, Download, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { BRAND, formatZar } from "@/lib/email-generator/brand";
 import {
   buildLookbookProducts,
   groupProducts,
@@ -55,6 +55,19 @@ export function LookbookSection({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<"pdf" | "png" | null>(null);
+  const [editingCopy, setEditingCopy] = useState(false);
+
+  const updateNarrative = useCallback(
+    (idx: number, value: string) => {
+      setNarratives((prev) => {
+        const next = [...(prev || [])];
+        next[idx] = value;
+        onStateChange?.({ narratives: next });
+        return next;
+      });
+    },
+    [onStateChange]
+  );
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -81,6 +94,7 @@ export function LookbookSection({
       copy.productDescriptions || [],
       slotUrls
     );
+    const curatedTotal = curated.reduce((sum, p) => sum + p.priceZar, 0);
     const plan: ProductPagePlan[] = [];
     const curatedGroups = groupProducts(curated);
     curatedGroups.forEach((g) =>
@@ -92,6 +106,7 @@ export function LookbookSection({
     );
 
     const built: LookbookPage[] = [];
+    // Cover
     built.push({
       kind: "cover",
       heroUrl: slotUrls["hero"],
@@ -100,14 +115,49 @@ export function LookbookSection({
       lead: copy.leadParagraph || copy.heroSubheadline || "",
       wordmark: BRAND.wordmark,
     });
-    plan.forEach((p, idx) => {
+
+    let narrativeIdx = 0;
+    // Curated product pages
+    curatedGroups.forEach((g) => {
       built.push({
         kind: "products",
-        sectionLabel: p.sectionLabel,
-        narrative: narratives?.[idx] || "",
-        products: p.products,
+        sectionLabel: "The Curated Edit",
+        narrative: narratives?.[narrativeIdx++] || "",
+        products: g,
       });
     });
+
+    // Feature page: collection-banner (if image uploaded)
+    if (slotUrls["collection-banner"]) {
+      built.push({
+        kind: "feature",
+        imageUrl: slotUrls["collection-banner"],
+        eyebrow: copy.completeTheLookLine || "The Curated Edit",
+        caption: curatedTotal > 0 ? formatZar(curatedTotal) : undefined,
+      });
+    }
+
+    // Also Available product pages
+    individualGroups.forEach((g) => {
+      built.push({
+        kind: "products",
+        sectionLabel: "Also Available",
+        narrative: narratives?.[narrativeIdx++] || "",
+        products: g,
+      });
+    });
+
+    // Feature page: showcase (if image uploaded and individuals exist)
+    if (slotUrls["showcase"] && individual.length > 0) {
+      built.push({
+        kind: "feature",
+        imageUrl: slotUrls["showcase"],
+        eyebrow: copy.individualSectionLabel || "Also Available",
+        caption: undefined,
+      });
+    }
+
+    // Contact
     built.push({
       kind: "contact",
       whatsapp: BRAND.contact.whatsapp,
@@ -309,6 +359,49 @@ export function LookbookSection({
       {productPagesPlan.length === 0 && (
         <div className="text-sm text-amber-600">
           Upload images first so each product has an image for the lookbook page.
+        </div>
+      )}
+
+      {ready && (
+        <div className="border border-gray-200 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setEditingCopy((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 rounded-lg"
+          >
+            <span className="flex items-center gap-2">
+              {editingCopy ? (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              )}
+              Edit narratives ({productPagesPlan.length} page
+              {productPagesPlan.length === 1 ? "" : "s"})
+            </span>
+            <span className="text-xs text-gray-500">
+              {editingCopy ? "Changes update the preview live" : ""}
+            </span>
+          </button>
+          {editingCopy && (
+            <div className="px-4 pb-4 space-y-3">
+              {productPagesPlan.map((plan, idx) => (
+                <div key={idx}>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Page {idx + 2} &middot; {plan.sectionLabel}
+                    <span className="text-gray-400 font-normal ml-2">
+                      {plan.products.map((p) => p.name).join(", ")}
+                    </span>
+                  </label>
+                  <textarea
+                    value={narratives?.[idx] || ""}
+                    onChange={(e) => updateNarrative(idx, e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#4A1942] focus:ring-1 focus:ring-[#4A1942] resize-y"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

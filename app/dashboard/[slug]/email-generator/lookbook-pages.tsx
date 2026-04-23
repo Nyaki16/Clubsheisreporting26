@@ -283,6 +283,78 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
   );
 }
 
+function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }> }) {
+  return (
+    <PageShell>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflow: "hidden",
+          backgroundColor: P.charcoal,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={page.imageUrl}
+          crossOrigin="anonymous"
+          alt={page.caption || ""}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      </div>
+      {(page.eyebrow || page.caption) && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: "48px 60px",
+            background:
+              "linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0) 100%)",
+            textAlign: "center",
+          }}
+        >
+          {page.eyebrow && (
+            <div
+              style={{
+                fontFamily: F.sans,
+                fontSize: 11,
+                color: P.gold,
+                letterSpacing: 4,
+                textTransform: "uppercase",
+                marginBottom: page.caption ? 14 : 0,
+              }}
+            >
+              {page.eyebrow}
+            </div>
+          )}
+          {page.caption && (
+            <div
+              style={{
+                fontFamily: F.serif,
+                fontSize: 22,
+                fontWeight: 300,
+                color: P.white,
+                letterSpacing: 1,
+                maxWidth: 560,
+                margin: "0 auto",
+              }}
+            >
+              {page.caption}
+            </div>
+          )}
+        </div>
+      )}
+    </PageShell>
+  );
+}
+
 function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }> }) {
   return (
     <PageShell>
@@ -375,6 +447,7 @@ export function LookbookPageView({
     <div data-lookbook-page={pageNumber}>
       {page.kind === "cover" && <CoverPage page={page} />}
       {page.kind === "products" && <ProductsPage page={page} />}
+      {page.kind === "feature" && <FeaturePage page={page} />}
       {page.kind === "contact" && <ContactPage page={page} />}
     </div>
   );
