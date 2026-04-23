@@ -98,7 +98,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           fontFamily: F.serif,
           fontSize: 44,
           fontWeight: 300,
-          lineHeight: 1.1,
+          lineHeight: "50px",
           letterSpacing: 1,
           color: P.white,
         }}
@@ -115,7 +115,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
             textAlign: "center",
             fontFamily: F.serif,
             fontSize: 14,
-            lineHeight: 1.7,
+            lineHeight: "24px",
             fontStyle: "italic",
             color: P.greyText,
           }}
@@ -204,7 +204,7 @@ function ProductCard({
           fontWeight: 300,
           color: P.white,
           letterSpacing: 0.5,
-          lineHeight: 1.2,
+          lineHeight: "normal",
         }}
       >
         {name}
@@ -222,7 +222,7 @@ function ProductCard({
             color: P.greyText,
             letterSpacing: 2.5,
             textTransform: "uppercase",
-            lineHeight: 1.2,
+            lineHeight: "normal",
           }}
         >
           {description}
@@ -240,7 +240,7 @@ function ProductCard({
             fontSize: 9,
             color: P.greyText,
             fontStyle: "italic",
-            lineHeight: 1.2,
+            lineHeight: "normal",
           }}
         >
           {dimensions}
@@ -258,7 +258,7 @@ function ProductCard({
           fontWeight: 300,
           color: P.gold,
           letterSpacing: 1,
-          lineHeight: 1.2,
+          lineHeight: "normal",
         }}
       >
         {priceStr}
@@ -301,7 +301,7 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
             width: PAGE_W - 120,
             fontFamily: F.serif,
             fontSize: 15,
-            lineHeight: 1.7,
+            lineHeight: "24px",
             fontStyle: "italic",
             color: P.white,
           }}
@@ -441,7 +441,7 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 20,
-          lineHeight: 1.55,
+          lineHeight: "32px",
           fontStyle: "italic",
           color: P.white,
         }}

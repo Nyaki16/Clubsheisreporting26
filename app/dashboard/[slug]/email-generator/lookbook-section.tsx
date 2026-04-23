@@ -220,13 +220,32 @@ export function LookbookSection({
       if (typeof document !== "undefined" && document.fonts?.ready) {
         try {
           await document.fonts.ready;
-          await document.fonts.load("300 44px 'Cormorant Garamond'");
-          await document.fonts.load("300 18px 'Cormorant Garamond'");
-          await document.fonts.load("500 11px 'Montserrat'");
+          await Promise.all([
+            document.fonts.load("300 44px 'Cormorant Garamond'"),
+            document.fonts.load("300 22px 'Cormorant Garamond'"),
+            document.fonts.load("300 18px 'Cormorant Garamond'"),
+            document.fonts.load("italic 300 14px 'Cormorant Garamond'"),
+            document.fonts.load("500 11px 'Montserrat'"),
+            document.fonts.load("400 10px 'Montserrat'"),
+          ]);
         } catch {
           // best effort — render anyway
         }
       }
+      // Wait for images in the node to finish loading
+      const imgs = Array.from(node.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete && img.naturalWidth > 0
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                const done = () => resolve();
+                img.addEventListener("load", done, { once: true });
+                img.addEventListener("error", done, { once: true });
+                setTimeout(done, 8000);
+              })
+        )
+      );
       const html2canvasMod = await import("html2canvas-pro");
       const html2canvas = html2canvasMod.default;
       return html2canvas(node, {
@@ -236,6 +255,16 @@ export function LookbookSection({
         useCORS: true,
         backgroundColor: BRAND.palette.black,
         logging: false,
+        onclone: (clonedDoc: Document) => {
+          if (!clonedDoc.getElementById("lookbook-fonts-cloned")) {
+            const link = clonedDoc.createElement("link");
+            link.id = "lookbook-fonts-cloned";
+            link.rel = "stylesheet";
+            link.href =
+              "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Montserrat:wght@300;400;500&display=swap";
+            clonedDoc.head.appendChild(link);
+          }
+        },
       });
     },
     []
