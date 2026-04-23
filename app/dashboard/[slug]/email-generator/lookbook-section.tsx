@@ -416,55 +416,82 @@ export function LookbookSection({
       )}
 
       {ready && (
-        <div
-          ref={pagesContainerRef}
-          className="grid gap-4"
-          style={{
-            gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(
-              LOOKBOOK_PAGE_WIDTH * PREVIEW_SCALE
-            )}px, 1fr))`,
-          }}
-        >
-          {pages.map((page, i) => (
-            <div
-              key={i}
-              style={{
-                width: Math.round(LOOKBOOK_PAGE_WIDTH * PREVIEW_SCALE),
-                height: Math.round(LOOKBOOK_PAGE_HEIGHT * PREVIEW_SCALE),
-                overflow: "hidden",
-                position: "relative",
-                boxShadow: "0 6px 20px -4px rgba(0,0,0,0.25)",
-                borderRadius: 4,
-              }}
-            >
+        <>
+          <div
+            className="grid gap-4"
+            style={{
+              gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(
+                LOOKBOOK_PAGE_WIDTH * PREVIEW_SCALE
+              )}px, 1fr))`,
+            }}
+          >
+            {pages.map((page, i) => (
               <div
+                key={i}
                 style={{
-                  transform: `scale(${PREVIEW_SCALE})`,
-                  transformOrigin: "top left",
+                  width: Math.round(LOOKBOOK_PAGE_WIDTH * PREVIEW_SCALE),
+                  height: Math.round(LOOKBOOK_PAGE_HEIGHT * PREVIEW_SCALE),
+                  overflow: "hidden",
+                  position: "relative",
+                  boxShadow: "0 6px 20px -4px rgba(0,0,0,0.25)",
+                  borderRadius: 4,
+                }}
+              >
+                <div
+                  style={{
+                    transform: `scale(${PREVIEW_SCALE})`,
+                    transformOrigin: "top left",
+                    width: LOOKBOOK_PAGE_WIDTH,
+                    height: LOOKBOOK_PAGE_HEIGHT,
+                  }}
+                >
+                  <LookbookPageView page={page} pageNumber={-1} />
+                </div>
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 6,
+                    right: 8,
+                    fontFamily: "monospace",
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.5)",
+                    background: "rgba(0,0,0,0.45)",
+                    padding: "2px 6px",
+                    borderRadius: 3,
+                  }}
+                >
+                  {i + 1}/{pages.length}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Hidden full-size render targets for html2canvas capture */}
+          <div
+            ref={pagesContainerRef}
+            aria-hidden
+            style={{
+              position: "fixed",
+              top: 0,
+              left: "-20000px",
+              width: LOOKBOOK_PAGE_WIDTH,
+              pointerEvents: "none",
+              zIndex: -1,
+            }}
+          >
+            {pages.map((page, i) => (
+              <div
+                key={i}
+                style={{
                   width: LOOKBOOK_PAGE_WIDTH,
                   height: LOOKBOOK_PAGE_HEIGHT,
                 }}
               >
                 <LookbookPageView page={page} pageNumber={i} />
               </div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 6,
-                  right: 8,
-                  fontFamily: "monospace",
-                  fontSize: 10,
-                  color: "rgba(255,255,255,0.5)",
-                  background: "rgba(0,0,0,0.45)",
-                  padding: "2px 6px",
-                  borderRadius: 3,
-                }}
-              >
-                {i + 1}/{pages.length}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );
