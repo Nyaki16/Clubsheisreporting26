@@ -167,7 +167,7 @@ export function LookbookSection({
         `[data-lookbook-page="${idx}"]`
       );
       if (!node) return null;
-      const html2canvasMod = await import("html2canvas");
+      const html2canvasMod = await import("html2canvas-pro");
       const html2canvas = html2canvasMod.default;
       return html2canvas(node, {
         width: LOOKBOOK_PAGE_WIDTH,
