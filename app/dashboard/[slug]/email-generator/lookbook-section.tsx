@@ -217,6 +217,16 @@ export function LookbookSection({
         `[data-lookbook-page="${idx}"]`
       );
       if (!node) return null;
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        try {
+          await document.fonts.ready;
+          await document.fonts.load("300 44px 'Cormorant Garamond'");
+          await document.fonts.load("300 18px 'Cormorant Garamond'");
+          await document.fonts.load("500 11px 'Montserrat'");
+        } catch {
+          // best effort — render anyway
+        }
+      }
       const html2canvasMod = await import("html2canvas-pro");
       const html2canvas = html2canvasMod.default;
       return html2canvas(node, {

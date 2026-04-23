@@ -32,26 +32,29 @@ function PageShell({ children }: { children: React.ReactNode }) {
 function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> }) {
   return (
     <PageShell>
-      <div style={{ position: "absolute", top: 48, left: 0, right: 0, textAlign: "center" }}>
-        <span
-          style={{
-            fontFamily: F.serif,
-            fontSize: 18,
-            fontWeight: 300,
-            color: P.gold,
-            letterSpacing: 10,
-            textTransform: "uppercase",
-          }}
-        >
-          {page.wordmark}
-        </span>
+      <div
+        style={{
+          position: "absolute",
+          top: 48,
+          left: 0,
+          width: PAGE_W,
+          textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 18,
+          fontWeight: 300,
+          color: P.gold,
+          letterSpacing: 10,
+          textTransform: "uppercase",
+        }}
+      >
+        {page.wordmark}
       </div>
       <div
         style={{
           position: "absolute",
           top: 120,
           left: 60,
-          right: 60,
+          width: PAGE_W - 120,
           height: 520,
           overflow: "hidden",
           backgroundColor: P.charcoal,
@@ -67,64 +70,65 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           />
         ) : null}
       </div>
+      {page.subheadline && (
+        <div
+          style={{
+            position: "absolute",
+            top: 690,
+            left: 0,
+            width: PAGE_W,
+            textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 11,
+            color: P.gold,
+            letterSpacing: 4,
+            textTransform: "uppercase",
+          }}
+        >
+          {page.subheadline}
+        </div>
+      )}
       <div
         style={{
           position: "absolute",
-          top: 690,
+          top: 730,
           left: 70,
-          right: 70,
+          width: PAGE_W - 140,
           textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 44,
+          fontWeight: 300,
+          lineHeight: 1.1,
+          letterSpacing: 1,
+          color: P.white,
         }}
       >
-        {page.subheadline && (
-          <div
-            style={{
-              fontFamily: F.sans,
-              fontSize: 11,
-              color: P.gold,
-              letterSpacing: 4,
-              textTransform: "uppercase",
-              marginBottom: 18,
-            }}
-          >
-            {page.subheadline}
-          </div>
-        )}
+        {page.theme}
+      </div>
+      {page.lead && (
         <div
           style={{
+            position: "absolute",
+            top: 870,
+            left: 100,
+            width: PAGE_W - 200,
+            textAlign: "center",
             fontFamily: F.serif,
-            fontSize: 46,
-            fontWeight: 300,
-            letterSpacing: 1.5,
-            lineHeight: 1.1,
-            marginBottom: 28,
-            color: P.white,
+            fontSize: 14,
+            lineHeight: 1.7,
+            fontStyle: "italic",
+            color: P.greyText,
           }}
         >
-          {page.theme}
+          {page.lead}
         </div>
-        {page.lead && (
-          <div
-            style={{
-              fontFamily: F.serif,
-              fontSize: 15,
-              lineHeight: 1.75,
-              fontStyle: "italic",
-              color: P.greyText,
-              maxWidth: 560,
-              margin: "0 auto",
-            }}
-          >
-            {page.lead}
-          </div>
-        )}
-      </div>
+      )}
       <div
         style={{
           position: "absolute",
           bottom: 40,
           left: 0,
-          right: 0,
+          width: PAGE_W,
           textAlign: "center",
           fontFamily: F.sans,
           fontSize: 9,
@@ -139,146 +143,193 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
   );
 }
 
-function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products" }> }) {
-  const IMG_H = 280;
-  const GAP = 36;
-  const items = page.products.slice(0, 4);
-  const rows: typeof items[] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
-
+function ProductCard({
+  imageUrl,
+  name,
+  description,
+  dimensions,
+  priceZar,
+  left,
+  top,
+  width,
+  imgHeight,
+}: {
+  imageUrl?: string;
+  name: string;
+  description?: string;
+  dimensions?: string;
+  priceZar: number;
+  left: number;
+  top: number;
+  width: number;
+  imgHeight: number;
+}) {
+  const priceStr = "R " + priceZar.toLocaleString("en-ZA");
+  const nameY = top + imgHeight + 16;
+  const descY = nameY + 30;
+  const dimY = description ? descY + 18 : descY;
+  const priceBelow = dimensions ? dimY + 20 : (description ? descY + 20 : nameY + 32);
   return (
-    <PageShell>
-      <div style={{ position: "absolute", top: 60, left: 60, right: 60 }}>
-        <div
-          style={{
-            fontFamily: F.sans,
-            fontSize: 11,
-            color: P.gold,
-            letterSpacing: 4,
-            textTransform: "uppercase",
-            marginBottom: 18,
-          }}
-        >
-          {page.sectionLabel}
-        </div>
-        {page.narrative && (
-          <div
-            style={{
-              fontFamily: F.serif,
-              fontSize: 15,
-              lineHeight: 1.7,
-              fontStyle: "italic",
-              color: P.white,
-              maxWidth: 600,
-            }}
-          >
-            {page.narrative}
-          </div>
-        )}
-      </div>
-
+    <>
       <div
         style={{
           position: "absolute",
-          top: 240,
-          left: 60,
-          right: 60,
-          display: "flex",
-          flexDirection: "column",
-          gap: GAP,
+          top,
+          left,
+          width,
+          height: imgHeight,
+          backgroundColor: P.charcoal,
+          overflow: "hidden",
         }}
       >
-        {rows.map((row, ri) => (
-          <div
-            key={ri}
-            style={{ display: "flex", gap: GAP, width: "100%" }}
-          >
-            {row.map((p, i) => (
-              <div key={i} style={{ flex: "1 1 0", minWidth: 0 }}>
-                <div
-                  style={{
-                    width: "100%",
-                    height: IMG_H,
-                    backgroundColor: P.charcoal,
-                    overflow: "hidden",
-                    marginBottom: 16,
-                  }}
-                >
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.imageUrl}
-                      crossOrigin="anonymous"
-                      alt={p.name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  ) : null}
-                </div>
-                <div
-                  style={{
-                    fontFamily: F.serif,
-                    fontSize: 20,
-                    fontWeight: 300,
-                    color: P.white,
-                    marginBottom: 4,
-                    textAlign: "center",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  {p.name}
-                </div>
-                {p.description && (
-                  <div
-                    style={{
-                      fontFamily: F.sans,
-                      fontSize: 9,
-                      color: P.greyText,
-                      letterSpacing: 2.5,
-                      textTransform: "uppercase",
-                      marginBottom: 6,
-                      textAlign: "center",
-                    }}
-                  >
-                    {p.description}
-                  </div>
-                )}
-                {p.dimensions && (
-                  <div
-                    style={{
-                      fontFamily: F.sans,
-                      fontSize: 9,
-                      color: P.greyText,
-                      fontStyle: "italic",
-                      marginBottom: 8,
-                      textAlign: "center",
-                    }}
-                  >
-                    {p.dimensions}
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontFamily: F.serif,
-                    fontSize: 18,
-                    fontWeight: 300,
-                    color: P.gold,
-                    textAlign: "center",
-                    letterSpacing: 1,
-                  }}
-                >
-                  R {p.priceZar.toLocaleString("en-ZA")}
-                </div>
-              </div>
-            ))}
-            {row.length === 1 ? <div style={{ flex: "1 1 0" }} /> : null}
-          </div>
-        ))}
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            crossOrigin="anonymous"
+            alt={name}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : null}
       </div>
+      <div
+        style={{
+          position: "absolute",
+          top: nameY,
+          left,
+          width,
+          textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 19,
+          fontWeight: 300,
+          color: P.white,
+          letterSpacing: 0.5,
+          lineHeight: 1.2,
+        }}
+      >
+        {name}
+      </div>
+      {description && (
+        <div
+          style={{
+            position: "absolute",
+            top: descY,
+            left,
+            width,
+            textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 9,
+            color: P.greyText,
+            letterSpacing: 2.5,
+            textTransform: "uppercase",
+            lineHeight: 1.2,
+          }}
+        >
+          {description}
+        </div>
+      )}
+      {dimensions && (
+        <div
+          style={{
+            position: "absolute",
+            top: dimY,
+            left,
+            width,
+            textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 9,
+            color: P.greyText,
+            fontStyle: "italic",
+            lineHeight: 1.2,
+          }}
+        >
+          {dimensions}
+        </div>
+      )}
+      <div
+        style={{
+          position: "absolute",
+          top: priceBelow,
+          left,
+          width,
+          textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 18,
+          fontWeight: 300,
+          color: P.gold,
+          letterSpacing: 1,
+          lineHeight: 1.2,
+        }}
+      >
+        {priceStr}
+      </div>
+    </>
+  );
+}
+
+function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products" }> }) {
+  const items = page.products.slice(0, 4);
+  const COL_W = (PAGE_W - 120 - 36) / 2; // left+right 60 each, gap 36
+  const IMG_H = 270;
+  const ROW_GAP = 40;
+  const CARD_H = IMG_H + 120; // image + text stack approx
+  const GRID_TOP = 250;
+
+  return (
+    <PageShell>
+      <div
+        style={{
+          position: "absolute",
+          top: 60,
+          left: 60,
+          width: PAGE_W - 120,
+          fontFamily: F.sans,
+          fontSize: 11,
+          color: P.gold,
+          letterSpacing: 4,
+          textTransform: "uppercase",
+        }}
+      >
+        {page.sectionLabel}
+      </div>
+      {page.narrative && (
+        <div
+          style={{
+            position: "absolute",
+            top: 96,
+            left: 60,
+            width: PAGE_W - 120,
+            fontFamily: F.serif,
+            fontSize: 15,
+            lineHeight: 1.7,
+            fontStyle: "italic",
+            color: P.white,
+          }}
+        >
+          {page.narrative}
+        </div>
+      )}
+
+      {items.map((p, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const left = 60 + col * (COL_W + 36);
+        const top = GRID_TOP + row * (CARD_H + ROW_GAP);
+        return (
+          <ProductCard
+            key={i}
+            imageUrl={p.imageUrl}
+            name={p.name}
+            description={p.description}
+            dimensions={p.dimensions}
+            priceZar={p.priceZar}
+            left={left}
+            top={top}
+            width={COL_W}
+            imgHeight={IMG_H}
+          />
+        );
+      })}
     </PageShell>
   );
 }
@@ -289,7 +340,10 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
+          width: PAGE_W,
+          height: PAGE_H,
           overflow: "hidden",
           backgroundColor: P.charcoal,
         }}
@@ -307,48 +361,51 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
           }}
         />
       </div>
-      {(page.eyebrow || page.caption) && (
+      <div
+        style={{
+          position: "absolute",
+          top: PAGE_H - 220,
+          left: 0,
+          width: PAGE_W,
+          height: 220,
+          background:
+            "linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0) 100%)",
+        }}
+      />
+      {page.eyebrow && (
         <div
           style={{
             position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: "48px 60px",
-            background:
-              "linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0) 100%)",
+            top: PAGE_H - 140,
+            left: 60,
+            width: PAGE_W - 120,
             textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 11,
+            color: P.gold,
+            letterSpacing: 4,
+            textTransform: "uppercase",
           }}
         >
-          {page.eyebrow && (
-            <div
-              style={{
-                fontFamily: F.sans,
-                fontSize: 11,
-                color: P.gold,
-                letterSpacing: 4,
-                textTransform: "uppercase",
-                marginBottom: page.caption ? 14 : 0,
-              }}
-            >
-              {page.eyebrow}
-            </div>
-          )}
-          {page.caption && (
-            <div
-              style={{
-                fontFamily: F.serif,
-                fontSize: 22,
-                fontWeight: 300,
-                color: P.white,
-                letterSpacing: 1,
-                maxWidth: 560,
-                margin: "0 auto",
-              }}
-            >
-              {page.caption}
-            </div>
-          )}
+          {page.eyebrow}
+        </div>
+      )}
+      {page.caption && (
+        <div
+          style={{
+            position: "absolute",
+            top: PAGE_H - 100,
+            left: 100,
+            width: PAGE_W - 200,
+            textAlign: "center",
+            fontFamily: F.serif,
+            fontSize: 22,
+            fontWeight: 300,
+            color: P.white,
+            letterSpacing: 1,
+          }}
+        >
+          {page.caption}
         </div>
       )}
     </PageShell>
@@ -361,67 +418,100 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
       <div
         style={{
           position: "absolute",
-          top: 160,
-          left: 60,
-          right: 60,
+          top: 200,
+          left: 0,
+          width: PAGE_W,
           textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 30,
+          fontWeight: 300,
+          color: P.gold,
+          letterSpacing: 12,
+          textTransform: "uppercase",
         }}
       >
-        <div
-          style={{
-            fontFamily: F.serif,
-            fontSize: 34,
-            fontWeight: 300,
-            color: P.gold,
-            letterSpacing: 12,
-            textTransform: "uppercase",
-            marginBottom: 48,
-          }}
-        >
-          {BRAND.wordmark}
-        </div>
-        <div
-          style={{
-            fontFamily: F.serif,
-            fontSize: 22,
-            lineHeight: 1.5,
-            fontStyle: "italic",
-            color: P.white,
-            maxWidth: 520,
-            margin: "0 auto 56px auto",
-          }}
-        >
-          &ldquo;Every piece we select, every detail we refine, exists for one reason — to make your space unmistakably yours.&rdquo;
-        </div>
-        <div
-          style={{
-            width: 60,
-            height: 1,
-            backgroundColor: P.gold,
-            margin: "0 auto 48px auto",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: F.sans,
-            fontSize: 11,
-            letterSpacing: 3,
-            textTransform: "uppercase",
-            color: P.greyText,
-            lineHeight: 2.6,
-          }}
-        >
-          <div>WhatsApp &middot; {page.phone}</div>
-          <div>{page.website.replace(/^https?:\/\//, "")}</div>
-          <div>Instagram {page.instagram}</div>
-        </div>
+        {BRAND.wordmark}
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 310,
+          left: 100,
+          width: PAGE_W - 200,
+          textAlign: "center",
+          fontFamily: F.serif,
+          fontSize: 20,
+          lineHeight: 1.55,
+          fontStyle: "italic",
+          color: P.white,
+        }}
+      >
+        &ldquo;Every piece we select, every detail we refine, exists for one reason — to make your space unmistakably yours.&rdquo;
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 500,
+          left: PAGE_W / 2 - 30,
+          width: 60,
+          height: 1,
+          backgroundColor: P.gold,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 560,
+          left: 0,
+          width: PAGE_W,
+          textAlign: "center",
+          fontFamily: F.sans,
+          fontSize: 11,
+          letterSpacing: 3,
+          textTransform: "uppercase",
+          color: P.greyText,
+        }}
+      >
+        WhatsApp &middot; {page.phone}
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 600,
+          left: 0,
+          width: PAGE_W,
+          textAlign: "center",
+          fontFamily: F.sans,
+          fontSize: 11,
+          letterSpacing: 3,
+          textTransform: "uppercase",
+          color: P.greyText,
+        }}
+      >
+        {page.website.replace(/^https?:\/\//, "")}
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 640,
+          left: 0,
+          width: PAGE_W,
+          textAlign: "center",
+          fontFamily: F.sans,
+          fontSize: 11,
+          letterSpacing: 3,
+          textTransform: "uppercase",
+          color: P.greyText,
+        }}
+      >
+        Instagram {page.instagram}
       </div>
       <div
         style={{
           position: "absolute",
           bottom: 48,
           left: 0,
-          right: 0,
+          width: PAGE_W,
           textAlign: "center",
           fontFamily: F.sans,
           fontSize: 10,
