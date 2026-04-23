@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { swapPlaceholders } from "@/lib/email-generator/html-builder";
 import type { AICopy, ImageSlot, SlotUrlMap } from "@/lib/email-generator/types";
+import { LookbookSection, type LookbookSavedState } from "./lookbook-section";
 
 const ACCESS_SLUG = "link-interiors";
 
@@ -311,6 +312,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const [suggestingThemes, setSuggestingThemes] = useState(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
+  const [lookbookState, setLookbookState] = useState<LookbookSavedState | null>(null);
   const loadedOnce = useRef(false);
 
   useEffect(() => {
@@ -350,6 +352,9 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
             }
             setSlotStates(restored);
           }
+          if (saved.lookbook && typeof saved.lookbook === "object") {
+            setLookbookState(saved.lookbook as LookbookSavedState);
+          }
           if (result.updatedAt) setLastSavedAt(result.updatedAt);
         }
       } catch {
@@ -368,7 +373,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
       return;
     }
     setDirty(true);
-  }, [campaignDate, theme, products, draft, slotStates, loadingSaved]);
+  }, [campaignDate, theme, products, draft, slotStates, lookbookState, loadingSaved]);
 
   const addRow = () => setProducts((ps) => [...ps, { ...EMPTY_ROW }]);
   const removeRow = (i: number) =>
@@ -401,6 +406,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     setDraft(null);
     setSlotStates({});
     setFinalHtml(null);
+    setLookbookState(null);
 
     const payload = {
       campaignDate,
@@ -574,6 +580,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         form: { campaignDate, theme, products },
         draft,
         slotUrls,
+        lookbook: lookbookState,
       };
       const res = await fetch("/api/email-generator/state", {
         method: "POST",
@@ -592,7 +599,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     } finally {
       setSaving(false);
     }
-  }, [campaignDate, theme, products, draft, slotStates]);
+  }, [campaignDate, theme, products, draft, slotStates, lookbookState]);
 
   const handleDownloadTemplate = useCallback(() => {
     downloadBlob("link-interiors-products-template.csv", "text/csv;charset=utf-8;", CSV_TEMPLATE);
@@ -689,6 +696,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     setThemeSuggestions(null);
     setSelectedSuggestion(null);
     setThemeError(null);
+    setLookbookState(null);
   }, []);
 
   if (slug !== ACCESS_SLUG) {
@@ -1198,6 +1206,32 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
             sandbox=""
           />
         </section>
+      )}
+
+      {draft && (
+        <LookbookSection
+          theme={theme}
+          campaignDate={campaignDate}
+          products={products.map((p) => ({
+            name: p.name.trim(),
+            priceZar: Number(p.priceZar) || 0,
+            productUrl: p.productUrl.trim(),
+            description: p.description.trim() || undefined,
+            dimensions: p.dimensions.trim() || undefined,
+            curated: p.curated !== false,
+          }))}
+          copy={draft.copy}
+          slots={draft.slots}
+          slotUrls={(() => {
+            const map: Record<string, string> = {};
+            for (const [id, s] of Object.entries(slotStates)) {
+              if (s && s.url) map[id] = s.url;
+            }
+            return map;
+          })()}
+          initialState={lookbookState}
+          onStateChange={(s) => setLookbookState(s)}
+        />
       )}
     </div>
   );
