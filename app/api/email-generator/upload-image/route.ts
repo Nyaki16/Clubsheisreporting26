@@ -1,19 +1,11 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
+import { isAuthorized } from "@/lib/email-generator/auth";
 
 export const maxDuration = 60;
 
 const GHL_UPLOAD_URL = "https://services.leadconnectorhq.com/medias/upload-file";
 const MAX_BYTES = 25 * 1024 * 1024;
-
-function checkAuth(request: NextRequest): boolean {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return true;
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${adminPassword}`) return true;
-  const adminCookie = request.cookies.get("admin_session");
-  return adminCookie?.value === "true";
-}
 
 function slugify(s: string): string {
   return s
@@ -25,10 +17,6 @@ function slugify(s: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const form = await request.formData();
     const file = form.get("file");
     const slotId = form.get("slotId");
@@ -44,6 +32,9 @@ export async function POST(request: NextRequest) {
     }
     if (typeof slug !== "string" || !slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    if (!isAuthorized(request, slug)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     if (file.size === 0) {
       return Response.json({ error: "Empty file" }, { status: 400 });

@@ -1,18 +1,10 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { getBrand } from "@/lib/email-generator/brand";
+import { isAuthorized } from "@/lib/email-generator/auth";
 
 export const maxDuration = 30;
 const SECTION = "email_generator";
-
-function checkAuth(request: NextRequest): boolean {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return true;
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${adminPassword}`) return true;
-  const adminCookie = request.cookies.get("admin_session");
-  return adminCookie?.value === "true";
-}
 
 function getSlugFromRequest(request: NextRequest): string | null {
   const url = new URL(request.url);
@@ -39,13 +31,13 @@ async function resolveClient(slug: string) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
   try {
     const slug = getSlugFromRequest(request);
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    if (!isAuthorized(request, slug)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);
     if ("error" in resolved) {
@@ -73,9 +65,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
   try {
     const body = await request.json();
     if (!body || typeof body !== "object") {
@@ -86,6 +75,9 @@ export async function POST(request: NextRequest) {
       : "";
     if (!slug) {
       return Response.json({ error: "slug required in body" }, { status: 400 });
+    }
+    if (!isAuthorized(request, slug)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);
     if ("error" in resolved) {
@@ -125,13 +117,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!checkAuth(request)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
   try {
     const slug = getSlugFromRequest(request);
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    if (!isAuthorized(request, slug)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);
     if ("error" in resolved) {

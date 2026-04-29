@@ -2,18 +2,10 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServiceClient } from "@/lib/supabase";
 import { getBrand, type Brand } from "@/lib/email-generator/brand";
+import { isAuthorized } from "@/lib/email-generator/auth";
 import type { ProductInput } from "@/lib/email-generator/types";
 
 export const maxDuration = 60;
-
-function checkAuth(request: NextRequest): boolean {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return true;
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${adminPassword}`) return true;
-  const adminCookie = request.cookies.get("admin_session");
-  return adminCookie?.value === "true";
-}
 
 function southAfricanSeason(dateIso: string): string {
   const d = new Date(dateIso);
@@ -97,13 +89,13 @@ async function fetchRecentNotes(
 
 export async function POST(request: NextRequest) {
   try {
-    if (!checkAuth(request)) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
     const body = await request.json();
     const slug = typeof body?.slug === "string" ? body.slug.trim() : "";
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    if (!isAuthorized(request, slug)) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const brand = getBrand(slug);
     if (!brand) {
