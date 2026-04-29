@@ -1,16 +1,15 @@
+import type { Brand } from "./brand";
 import type { ProductInput } from "./types";
 
-export const BRAND_SYSTEM_PROMPT = `You are a senior copywriter for Link Interiors, a South African luxury interior design and furniture brand based in Johannesburg.
+export function buildBrandSystemPrompt(brand: Brand): string {
+  return `You are a senior copywriter for ${brand.wordmark}.
 
-Brand voice:
-- Magazine editorial — understated confidence, never salesy
-- Short, intentional sentences
-- Let the products speak; copy frames them
-- Aspirational but grounded: attainable luxury for people who care about their space
-- Avoid exclamation marks, corny slogans, cliches ("transform your home", "elevate", "game-changer")
-- No hashtags, no emojis
-- South African English spelling (e.g. "colour", not "color")
-- Currency: ZAR (Rand), formatted "R 32,500"
+About the brand:
+${brand.voice.description}
+
+Tone: ${brand.voice.tone}.
+
+Currency: ZAR (Rand), formatted "R 32,500".
 
 The email is structured as two groups:
 
@@ -48,6 +47,7 @@ Rules:
 - Output must be parseable JSON. No trailing commas, no comments.
 - Do not include any text outside the JSON object.
 - If the theme is empty, default to a seasonal or "new arrivals" angle.`;
+}
 
 export function buildUserPrompt(input: {
   theme: string;

@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildDraftHtml, planSlots } from "@/lib/email-generator/html-builder";
-import { BRAND_SYSTEM_PROMPT, buildUserPrompt } from "@/lib/email-generator/prompts";
+import { buildBrandSystemPrompt, buildUserPrompt } from "@/lib/email-generator/prompts";
+import { getBrand } from "@/lib/email-generator/brand";
 import type { AICopy, CampaignInput, ProductInput } from "@/lib/email-generator/types";
 
 export const maxDuration = 60;
@@ -15,9 +16,11 @@ function checkAuth(request: NextRequest): boolean {
   return adminCookie?.value === "true";
 }
 
-function validate(input: unknown): { ok: true; data: CampaignInput } | { ok: false; error: string } {
+function validate(input: unknown): { ok: true; slug: string; data: CampaignInput } | { ok: false; error: string } {
   if (!input || typeof input !== "object") return { ok: false, error: "Invalid body" };
   const i = input as Record<string, unknown>;
+  const slug = typeof i.slug === "string" ? i.slug.trim() : "";
+  if (!slug) return { ok: false, error: "slug required" };
   const campaignDate = typeof i.campaignDate === "string" ? i.campaignDate : "";
   const theme = typeof i.theme === "string" ? i.theme : "";
   if (!campaignDate) return { ok: false, error: "campaignDate required" };
@@ -60,7 +63,7 @@ function validate(input: unknown): { ok: true; data: CampaignInput } | { ok: fal
       error: "At least one product must be part of the curated edit",
     };
   }
-  return { ok: true, data: { campaignDate, theme, products } };
+  return { ok: true, slug, data: { campaignDate, theme, products } };
 }
 
 export async function POST(request: NextRequest) {
@@ -73,6 +76,13 @@ export async function POST(request: NextRequest) {
     const parsed = validate(body);
     if (!parsed.ok) {
       return Response.json({ error: parsed.error }, { status: 400 });
+    }
+    const brand = getBrand(parsed.slug);
+    if (!brand) {
+      return Response.json(
+        { error: `Email generator not configured for "${parsed.slug}"` },
+        { status: 400 }
+      );
     }
     const { campaignDate, theme, products } = parsed.data;
     const curatedProducts = products.filter((p) => p.curated !== false);
@@ -100,7 +110,7 @@ export async function POST(request: NextRequest) {
       system: [
         {
           type: "text",
-          text: BRAND_SYSTEM_PROMPT,
+          text: buildBrandSystemPrompt(brand),
           cache_control: { type: "ephemeral" },
         },
       ],
@@ -138,7 +148,7 @@ export async function POST(request: NextRequest) {
     copy.individualNarrative = copy.individualNarrative || "";
     copy.leadParagraph = copy.leadParagraph || "";
 
-    const html = buildDraftHtml({ products, copy, curatedTotalZar });
+    const html = buildDraftHtml({ brand, products, copy, curatedTotalZar });
     const slots = planSlots(products);
 
     return Response.json({

@@ -20,10 +20,10 @@ import {
   Pencil,
 } from "lucide-react";
 import { buildDraftHtml, swapPlaceholders } from "@/lib/email-generator/html-builder";
+import { getBrand } from "@/lib/email-generator/brand";
 import type { AICopy, ImageSlot, ProductInput, SlotUrlMap } from "@/lib/email-generator/types";
 import { LookbookSection, type LookbookSavedState } from "./lookbook-section";
 
-const ACCESS_SLUG = "link-interiors";
 
 interface ProductRow {
   name: string;
@@ -289,6 +289,8 @@ async function resizeImageIfNeeded(
 }
 
 export function EmailGeneratorContent({ slug }: { slug: string }) {
+  const brand = useMemo(() => getBrand(slug), [slug]);
+
   const [campaignDate, setCampaignDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
@@ -304,7 +306,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
   const [copiedSubject, setCopiedSubject] = useState(false);
 
-  const [loadingSaved, setLoadingSaved] = useState(slug === ACCESS_SLUG);
+  const [loadingSaved, setLoadingSaved] = useState(!!brand);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -320,12 +322,15 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
   const loadedOnce = useRef(false);
 
   useEffect(() => {
-    if (slug !== ACCESS_SLUG) return;
+    if (!brand) return;
     if (loadedOnce.current) return;
     loadedOnce.current = true;
     (async () => {
       try {
-        const res = await fetch("/api/email-generator/state", { method: "GET" });
+        const res = await fetch(
+          `/api/email-generator/state?slug=${encodeURIComponent(slug)}`,
+          { method: "GET" }
+        );
         if (!res.ok) {
           setLoadingSaved(false);
           return;
@@ -367,7 +372,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         setLoadingSaved(false);
       }
     })();
-  }, [slug]);
+  }, [slug, brand]);
 
   const hasHydrated = useRef(false);
   useEffect(() => {
@@ -413,6 +418,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     setLookbookState(null);
 
     const payload = {
+      slug,
       campaignDate,
       theme: theme.trim(),
       products: products.map((p) => ({
@@ -442,7 +448,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     } finally {
       setDraftLoading(false);
     }
-  }, [campaignDate, theme, products]);
+  }, [campaignDate, theme, products, slug]);
 
   const handleFileForSlot = useCallback(
     async (slotId: string, file: File) => {
@@ -470,6 +476,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
 
       const form = new FormData();
       form.append("file", upload);
+      form.append("slug", slug);
       form.append("slotId", slotId);
       form.append("campaignDate", campaignDate);
       if (slot?.productName) form.append("productName", slot.productName);
@@ -526,7 +533,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
       }
       setFinalHtml(null);
     },
-    [draft, campaignDate]
+    [draft, campaignDate, slug]
   );
 
   const allUploaded = useMemo(() => {
@@ -547,6 +554,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
 
   const updateCopy = useCallback(
     (patch: Partial<AICopy>) => {
+      if (!brand) return;
       setDraft((d) => {
         if (!d) return d;
         const newCopy = { ...d.copy, ...patch };
@@ -559,6 +567,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
           curated: p.curated !== false,
         }));
         const newHtml = buildDraftHtml({
+          brand,
           products: productInputs,
           copy: newCopy,
           curatedTotalZar: d.curatedTotalZar,
@@ -574,7 +583,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         return { ...d, copy: newCopy, html: newHtml };
       });
     },
-    [products, slotStates, finalHtml]
+    [brand, products, slotStates, finalHtml]
   );
 
   const updateStat = useCallback(
@@ -621,12 +630,12 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `link-interiors-${campaignDate}.html`;
+    a.download = `${slug}-${campaignDate}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [finalHtml, campaignDate]);
+  }, [finalHtml, campaignDate, slug]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -637,6 +646,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
         if (s?.url) slotUrls[id] = { url: s.url, fileName: s.fileName };
       }
       const payload = {
+        slug,
         form: { campaignDate, theme, products },
         draft,
         slotUrls,
@@ -659,11 +669,11 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     } finally {
       setSaving(false);
     }
-  }, [campaignDate, theme, products, draft, slotStates, lookbookState]);
+  }, [slug, campaignDate, theme, products, draft, slotStates, lookbookState]);
 
   const handleDownloadTemplate = useCallback(() => {
-    downloadBlob("link-interiors-products-template.csv", "text/csv;charset=utf-8;", CSV_TEMPLATE);
-  }, []);
+    downloadBlob(`${slug}-products-template.csv`, "text/csv;charset=utf-8;", CSV_TEMPLATE);
+  }, [slug]);
 
   const handleCsvUpload = useCallback(async (file: File) => {
     setCsvError(null);
@@ -696,6 +706,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     setSuggestingThemes(true);
     try {
       const payload = {
+        slug,
         campaignDate,
         products: products
           .filter((p) => p.name.trim())
@@ -724,7 +735,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     } finally {
       setSuggestingThemes(false);
     }
-  }, [campaignDate, products]);
+  }, [slug, campaignDate, products]);
 
   const applyThemeSuggestion = useCallback((s: ThemeSuggestion) => {
     setTheme(`${s.name}. ${s.direction}`);
@@ -739,7 +750,9 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
       if (!ok) return;
     }
     try {
-      await fetch("/api/email-generator/state", { method: "DELETE" });
+      await fetch(`/api/email-generator/state?slug=${encodeURIComponent(slug)}`, {
+        method: "DELETE",
+      });
     } catch {
       // proceed anyway — clear local state even if the delete failed
     }
@@ -757,15 +770,15 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
     setSelectedSuggestion(null);
     setThemeError(null);
     setLookbookState(null);
-  }, []);
+  }, [slug]);
 
-  if (slug !== ACCESS_SLUG) {
+  if (!brand) {
     return (
       <div className="space-y-4">
         <h2 className="font-serif text-xl font-semibold text-gray-900">Email Generator</h2>
         <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
           <p className="text-sm text-gray-600">
-            This tool is only available for Link Interiors.
+            The Email Generator is not configured for this client yet.
           </p>
         </div>
       </div>
@@ -1423,6 +1436,7 @@ export function EmailGeneratorContent({ slug }: { slug: string }) {
 
       {draft && (
         <LookbookSection
+          brand={brand}
           theme={theme}
           campaignDate={campaignDate}
           products={products.map((p) => ({

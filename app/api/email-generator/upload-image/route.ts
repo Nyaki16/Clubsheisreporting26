@@ -4,7 +4,6 @@ import { getServiceClient } from "@/lib/supabase";
 export const maxDuration = 60;
 
 const GHL_UPLOAD_URL = "https://services.leadconnectorhq.com/medias/upload-file";
-const LINK_INTERIORS_SLUG = "link-interiors";
 const MAX_BYTES = 25 * 1024 * 1024;
 
 function checkAuth(request: NextRequest): boolean {
@@ -35,12 +34,16 @@ export async function POST(request: NextRequest) {
     const slotId = form.get("slotId");
     const campaignDate = form.get("campaignDate");
     const productName = form.get("productName");
+    const slug = form.get("slug");
 
     if (!(file instanceof File)) {
       return Response.json({ error: "file required" }, { status: 400 });
     }
     if (typeof slotId !== "string" || !slotId) {
       return Response.json({ error: "slotId required" }, { status: 400 });
+    }
+    if (typeof slug !== "string" || !slug) {
+      return Response.json({ error: "slug required" }, { status: 400 });
     }
     if (file.size === 0) {
       return Response.json({ error: "Empty file" }, { status: 400 });
@@ -56,10 +59,10 @@ export async function POST(request: NextRequest) {
     const { data: client } = await supabase
       .from("clients")
       .select("id")
-      .eq("slug", LINK_INTERIORS_SLUG)
+      .eq("slug", slug)
       .single();
     if (!client) {
-      return Response.json({ error: "Link Interiors client not found" }, { status: 404 });
+      return Response.json({ error: `Client "${slug}" not found` }, { status: 404 });
     }
 
     const { data: keyRows } = await supabase
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
     const locationId = keys.ghl_account_id;
     if (!pitKey || !locationId) {
       return Response.json(
-        { error: "Missing ghl_pit_key or ghl_account_id for Link Interiors" },
+        { error: `Missing ghl_pit_key or ghl_account_id for "${slug}"` },
         { status: 400 }
       );
     }
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
       (file.type === "image/png" ? ".png" : file.type === "image/webp" ? ".webp" : ".jpg");
     const productSlug = typeof productName === "string" && productName ? slugify(productName) : slotId;
     const datePart = typeof campaignDate === "string" && campaignDate ? campaignDate : new Date().toISOString().slice(0, 10);
-    const uploadName = `link-interiors-${datePart}-${productSlug}${ext}`;
+    const uploadName = `${slug}-${datePart}-${productSlug}${ext}`;
 
     const outbound = new FormData();
     outbound.append("locationId", locationId);

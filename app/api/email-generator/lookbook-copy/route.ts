@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { getBrand, type Brand } from "@/lib/email-generator/brand";
 
 export const maxDuration = 60;
 
@@ -12,11 +13,15 @@ function checkAuth(request: NextRequest): boolean {
   return adminCookie?.value === "true";
 }
 
-const SYSTEM_PROMPT = `You are a senior magazine editor writing copy for a Link Interiors lookbook.
+function buildSystemPrompt(brand: Brand): string {
+  return `You are a senior magazine editor writing copy for a ${brand.wordmark} lookbook.
 
-Link Interiors is a South African luxury interior design and furniture brand based in Johannesburg.
+About the brand:
+${brand.voice.description}
 
-Voice:
+Tone: ${brand.voice.tone}.
+
+Voice rules for this lookbook:
 - Magazine editorial — warm, luxurious, unhurried
 - Short, intentional sentences
 - Elevated luxury, never salesy
@@ -45,6 +50,7 @@ Return a single JSON object, no prose, no markdown fences:
 }
 
 The pages array length must match the number of pages provided, in order.`;
+}
 
 interface PageInput {
   sectionLabel: string;
@@ -86,6 +92,17 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
+    const slug = typeof body?.slug === "string" ? body.slug.trim() : "";
+    if (!slug) {
+      return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    const brand = getBrand(slug);
+    if (!brand) {
+      return Response.json(
+        { error: `Email generator not configured for "${slug}"` },
+        { status: 400 }
+      );
+    }
     const theme = typeof body?.theme === "string" ? body.theme : "";
     const campaignDate = typeof body?.campaignDate === "string" ? body.campaignDate : "";
     const rawPages = Array.isArray(body?.pages) ? body.pages : [];
@@ -127,7 +144,7 @@ export async function POST(request: NextRequest) {
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
       system: [
-        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        { type: "text", text: buildSystemPrompt(brand), cache_control: { type: "ephemeral" } },
       ],
       messages: [{ role: "user", content: userPrompt }],
     });

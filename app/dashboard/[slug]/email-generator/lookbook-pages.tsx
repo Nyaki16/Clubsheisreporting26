@@ -2,26 +2,25 @@
 
 import React from "react";
 import type { LookbookPage } from "@/lib/email-generator/lookbook-plan";
-import { BRAND } from "@/lib/email-generator/brand";
+import type { Brand } from "@/lib/email-generator/brand";
 
 const PAGE_W = 794;
 const PAGE_H = 1123;
-const { palette: P, fonts: F } = BRAND;
 
 export const LOOKBOOK_PAGE_WIDTH = PAGE_W;
 export const LOOKBOOK_PAGE_HEIGHT = PAGE_H;
 
-function PageShell({ children }: { children: React.ReactNode }) {
+function PageShell({ brand, children }: { brand: Brand; children: React.ReactNode }) {
   return (
     <div
       style={{
         width: `${PAGE_W}px`,
         height: `${PAGE_H}px`,
-        backgroundColor: P.black,
-        color: P.white,
+        backgroundColor: brand.palette.bg,
+        color: brand.palette.text,
         position: "relative",
         overflow: "hidden",
-        fontFamily: F.sans,
+        fontFamily: brand.fonts.sans,
       }}
     >
       {children}
@@ -29,9 +28,30 @@ function PageShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> }) {
+function CoverPage({
+  page,
+  brand,
+}: {
+  page: Extract<LookbookPage, { kind: "cover" }>;
+  brand: Brand;
+}) {
+  const P = brand.palette;
+  const F = brand.fonts;
+  const headerInner = brand.logoImageUrl ? (
+    <span style={{ display: "inline-block" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={brand.logoImageUrl}
+        alt={brand.wordmark}
+        crossOrigin="anonymous"
+        style={{ maxHeight: 40, height: "auto", display: "inline-block" }}
+      />
+    </span>
+  ) : (
+    page.wordmark
+  );
   return (
-    <PageShell>
+    <PageShell brand={brand}>
       <div
         style={{
           position: "absolute",
@@ -41,13 +61,13 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 18,
-          fontWeight: 300,
-          color: P.gold,
+          fontWeight: F.headingsWeight,
+          color: P.accent,
           letterSpacing: 10,
           textTransform: "uppercase",
         }}
       >
-        {page.wordmark}
+        {headerInner}
       </div>
       <div
         style={{
@@ -57,7 +77,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           width: PAGE_W - 120,
           height: 520,
           overflow: "hidden",
-          backgroundColor: P.charcoal,
+          backgroundColor: P.bgAlt,
         }}
       >
         {page.heroUrl ? (
@@ -80,7 +100,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
             textAlign: "center",
             fontFamily: F.sans,
             fontSize: 11,
-            color: P.gold,
+            color: P.accent,
             letterSpacing: 4,
             textTransform: "uppercase",
           }}
@@ -97,10 +117,10 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 44,
-          fontWeight: 300,
+          fontWeight: F.headingsWeight,
           lineHeight: "50px",
           letterSpacing: 1,
-          color: P.white,
+          color: P.text,
         }}
       >
         {page.theme}
@@ -117,7 +137,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
             fontSize: 14,
             lineHeight: "24px",
             fontStyle: "italic",
-            color: P.greyText,
+            color: P.textMuted,
           }}
         >
           {page.lead}
@@ -132,7 +152,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
           textAlign: "center",
           fontFamily: F.sans,
           fontSize: 9,
-          color: P.greyText,
+          color: P.textMuted,
           letterSpacing: 3,
           textTransform: "uppercase",
         }}
@@ -144,6 +164,7 @@ function CoverPage({ page }: { page: Extract<LookbookPage, { kind: "cover" }> })
 }
 
 function ProductCard({
+  brand,
   imageUrl,
   name,
   description,
@@ -154,6 +175,7 @@ function ProductCard({
   width,
   imgHeight,
 }: {
+  brand: Brand;
   imageUrl?: string;
   name: string;
   description?: string;
@@ -164,11 +186,13 @@ function ProductCard({
   width: number;
   imgHeight: number;
 }) {
+  const P = brand.palette;
+  const F = brand.fonts;
   const priceStr = "R " + priceZar.toLocaleString("en-ZA");
   const nameY = top + imgHeight + 16;
   const descY = nameY + 30;
   const dimY = description ? descY + 18 : descY;
-  const priceBelow = dimensions ? dimY + 20 : (description ? descY + 20 : nameY + 32);
+  const priceBelow = dimensions ? dimY + 20 : description ? descY + 20 : nameY + 32;
   return (
     <>
       <div
@@ -178,7 +202,7 @@ function ProductCard({
           left,
           width,
           height: imgHeight,
-          backgroundColor: P.charcoal,
+          backgroundColor: P.bgAlt,
           overflow: "hidden",
         }}
       >
@@ -201,8 +225,8 @@ function ProductCard({
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 19,
-          fontWeight: 300,
-          color: P.white,
+          fontWeight: F.headingsWeight,
+          color: P.text,
           letterSpacing: 0.5,
           lineHeight: "normal",
         }}
@@ -219,7 +243,7 @@ function ProductCard({
             textAlign: "center",
             fontFamily: F.sans,
             fontSize: 9,
-            color: P.greyText,
+            color: P.textMuted,
             letterSpacing: 2.5,
             textTransform: "uppercase",
             lineHeight: "normal",
@@ -238,7 +262,7 @@ function ProductCard({
             textAlign: "center",
             fontFamily: F.sans,
             fontSize: 9,
-            color: P.greyText,
+            color: P.textMuted,
             fontStyle: "italic",
             lineHeight: "normal",
           }}
@@ -255,8 +279,8 @@ function ProductCard({
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 18,
-          fontWeight: 300,
-          color: P.gold,
+          fontWeight: F.headingsWeight,
+          color: P.accent,
           letterSpacing: 1,
           lineHeight: "normal",
         }}
@@ -267,16 +291,24 @@ function ProductCard({
   );
 }
 
-function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products" }> }) {
+function ProductsPage({
+  page,
+  brand,
+}: {
+  page: Extract<LookbookPage, { kind: "products" }>;
+  brand: Brand;
+}) {
+  const P = brand.palette;
+  const F = brand.fonts;
   const items = page.products.slice(0, 4);
-  const COL_W = (PAGE_W - 120 - 36) / 2; // left+right 60 each, gap 36
+  const COL_W = (PAGE_W - 120 - 36) / 2;
   const IMG_H = 270;
   const ROW_GAP = 40;
-  const CARD_H = IMG_H + 120; // image + text stack approx
+  const CARD_H = IMG_H + 120;
   const GRID_TOP = 250;
 
   return (
-    <PageShell>
+    <PageShell brand={brand}>
       <div
         style={{
           position: "absolute",
@@ -285,7 +317,7 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
           width: PAGE_W - 120,
           fontFamily: F.sans,
           fontSize: 11,
-          color: P.gold,
+          color: P.accent,
           letterSpacing: 4,
           textTransform: "uppercase",
         }}
@@ -301,9 +333,9 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
             width: PAGE_W - 120,
             fontFamily: F.serif,
             fontSize: 15,
-            lineHeight: "24px",
+            lineHeight: "26px",
             fontStyle: "italic",
-            color: P.white,
+            color: P.text,
           }}
         >
           {page.narrative}
@@ -318,6 +350,7 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
         return (
           <ProductCard
             key={i}
+            brand={brand}
             imageUrl={p.imageUrl}
             name={p.name}
             description={p.description}
@@ -334,9 +367,21 @@ function ProductsPage({ page }: { page: Extract<LookbookPage, { kind: "products"
   );
 }
 
-function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }> }) {
+function FeaturePage({
+  page,
+  brand,
+}: {
+  page: Extract<LookbookPage, { kind: "feature" }>;
+  brand: Brand;
+}) {
+  const P = brand.palette;
+  const F = brand.fonts;
+  const overlay =
+    brand.emailTheme === "light"
+      ? "linear-gradient(to top, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 100%)"
+      : "linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0) 100%)";
   return (
-    <PageShell>
+    <PageShell brand={brand}>
       <div
         style={{
           position: "absolute",
@@ -345,7 +390,7 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
           width: PAGE_W,
           height: PAGE_H,
           overflow: "hidden",
-          backgroundColor: P.charcoal,
+          backgroundColor: P.bgAlt,
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -353,12 +398,7 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
           src={page.imageUrl}
           crossOrigin="anonymous"
           alt={page.caption || ""}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
       </div>
       <div
@@ -368,8 +408,7 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
           left: 0,
           width: PAGE_W,
           height: 220,
-          background:
-            "linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0) 100%)",
+          background: overlay,
         }}
       />
       {page.eyebrow && (
@@ -382,7 +421,7 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
             textAlign: "center",
             fontFamily: F.sans,
             fontSize: 11,
-            color: P.gold,
+            color: P.accent,
             letterSpacing: 4,
             textTransform: "uppercase",
           }}
@@ -400,8 +439,8 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
             textAlign: "center",
             fontFamily: F.serif,
             fontSize: 22,
-            fontWeight: 300,
-            color: P.white,
+            fontWeight: F.headingsWeight,
+            color: P.text,
             letterSpacing: 1,
           }}
         >
@@ -412,9 +451,17 @@ function FeaturePage({ page }: { page: Extract<LookbookPage, { kind: "feature" }
   );
 }
 
-function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }> }) {
+function ContactPage({
+  page,
+  brand,
+}: {
+  page: Extract<LookbookPage, { kind: "contact" }>;
+  brand: Brand;
+}) {
+  const P = brand.palette;
+  const F = brand.fonts;
   return (
-    <PageShell>
+    <PageShell brand={brand}>
       <div
         style={{
           position: "absolute",
@@ -424,13 +471,13 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           textAlign: "center",
           fontFamily: F.serif,
           fontSize: 30,
-          fontWeight: 300,
-          color: P.gold,
+          fontWeight: F.headingsWeight,
+          color: P.accent,
           letterSpacing: 12,
           textTransform: "uppercase",
         }}
       >
-        {BRAND.wordmark}
+        {brand.wordmark}
       </div>
       <div
         style={{
@@ -443,7 +490,7 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           fontSize: 20,
           lineHeight: "32px",
           fontStyle: "italic",
-          color: P.white,
+          color: P.text,
         }}
       >
         &ldquo;Every piece we select, every detail we refine, exists for one reason — to make your space unmistakably yours.&rdquo;
@@ -455,25 +502,27 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           left: PAGE_W / 2 - 30,
           width: 60,
           height: 1,
-          backgroundColor: P.gold,
+          backgroundColor: P.accent,
         }}
       />
-      <div
-        style={{
-          position: "absolute",
-          top: 560,
-          left: 0,
-          width: PAGE_W,
-          textAlign: "center",
-          fontFamily: F.sans,
-          fontSize: 11,
-          letterSpacing: 3,
-          textTransform: "uppercase",
-          color: P.greyText,
-        }}
-      >
-        WhatsApp &middot; {page.phone}
-      </div>
+      {page.phone && (
+        <div
+          style={{
+            position: "absolute",
+            top: 560,
+            left: 0,
+            width: PAGE_W,
+            textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 11,
+            letterSpacing: 3,
+            textTransform: "uppercase",
+            color: P.textMuted,
+          }}
+        >
+          {page.whatsapp ? "WhatsApp" : "Phone"} &middot; {page.phone}
+        </div>
+      )}
       <div
         style={{
           position: "absolute",
@@ -485,27 +534,29 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           fontSize: 11,
           letterSpacing: 3,
           textTransform: "uppercase",
-          color: P.greyText,
+          color: P.textMuted,
         }}
       >
         {page.website.replace(/^https?:\/\//, "")}
       </div>
-      <div
-        style={{
-          position: "absolute",
-          top: 640,
-          left: 0,
-          width: PAGE_W,
-          textAlign: "center",
-          fontFamily: F.sans,
-          fontSize: 11,
-          letterSpacing: 3,
-          textTransform: "uppercase",
-          color: P.greyText,
-        }}
-      >
-        Instagram {page.instagram}
-      </div>
+      {page.instagram && (
+        <div
+          style={{
+            position: "absolute",
+            top: 640,
+            left: 0,
+            width: PAGE_W,
+            textAlign: "center",
+            fontFamily: F.sans,
+            fontSize: 11,
+            letterSpacing: 3,
+            textTransform: "uppercase",
+            color: P.textMuted,
+          }}
+        >
+          Instagram {page.instagram}
+        </div>
+      )}
       <div
         style={{
           position: "absolute",
@@ -517,10 +568,10 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
           fontSize: 10,
           letterSpacing: 3,
           textTransform: "uppercase",
-          color: P.greyText,
+          color: P.textMuted,
         }}
       >
-        Link Interiors &middot; Johannesburg
+        {brand.wordmark} &middot; Johannesburg
       </div>
     </PageShell>
   );
@@ -529,16 +580,18 @@ function ContactPage({ page }: { page: Extract<LookbookPage, { kind: "contact" }
 export function LookbookPageView({
   page,
   pageNumber,
+  brand,
 }: {
   page: LookbookPage;
   pageNumber: number;
+  brand: Brand;
 }) {
   return (
     <div data-lookbook-page={pageNumber}>
-      {page.kind === "cover" && <CoverPage page={page} />}
-      {page.kind === "products" && <ProductsPage page={page} />}
-      {page.kind === "feature" && <FeaturePage page={page} />}
-      {page.kind === "contact" && <ContactPage page={page} />}
+      {page.kind === "cover" && <CoverPage page={page} brand={brand} />}
+      {page.kind === "products" && <ProductsPage page={page} brand={brand} />}
+      {page.kind === "feature" && <FeaturePage page={page} brand={brand} />}
+      {page.kind === "contact" && <ContactPage page={page} brand={brand} />}
     </div>
   );
 }

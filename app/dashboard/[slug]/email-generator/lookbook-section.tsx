@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Sparkles, Download, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
-import { BRAND, formatZar } from "@/lib/email-generator/brand";
+import { type Brand, formatZar } from "@/lib/email-generator/brand";
 import {
   buildLookbookProducts,
   groupProducts,
@@ -28,6 +28,7 @@ interface ProductPagePlan {
 }
 
 interface Props {
+  brand: Brand;
   theme: string;
   campaignDate: string;
   products: ProductInput[];
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export function LookbookSection({
+  brand,
   theme,
   campaignDate,
   products,
@@ -113,7 +115,7 @@ export function LookbookSection({
       theme: copy.heroHeadline || "The Edit",
       subheadline: copy.collectionLabel || "",
       lead: copy.leadParagraph || copy.heroSubheadline || "",
-      wordmark: BRAND.wordmark,
+      wordmark: brand.wordmark,
     });
 
     let narrativeIdx = 0;
@@ -160,14 +162,14 @@ export function LookbookSection({
     // Contact
     built.push({
       kind: "contact",
-      whatsapp: BRAND.contact.whatsapp,
-      phone: BRAND.contact.phone,
-      website: BRAND.contact.website,
-      instagram: BRAND.contact.instagram,
+      whatsapp: brand.contact.whatsapp || "",
+      phone: brand.contact.phone || "",
+      website: brand.contact.website,
+      instagram: brand.contact.instagram || "",
     });
 
     return { productPagesPlan: plan, pages: built };
-  }, [products, copy, slotUrls, narratives]);
+  }, [brand, products, copy, slotUrls, narratives]);
 
   const pagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,6 +178,7 @@ export function LookbookSection({
     setGenerating(true);
     try {
       const payload = {
+        slug: brand.slug,
         theme,
         campaignDate,
         pages: productPagesPlan.map((p) => ({
@@ -207,7 +210,7 @@ export function LookbookSection({
     } finally {
       setGenerating(false);
     }
-  }, [theme, campaignDate, productPagesPlan, onStateChange]);
+  }, [theme, campaignDate, productPagesPlan, onStateChange, brand.slug]);
 
   const capturePage = useCallback(
     async (idx: number): Promise<HTMLCanvasElement | null> => {
@@ -253,7 +256,7 @@ export function LookbookSection({
         height: LOOKBOOK_PAGE_HEIGHT,
         scale: 2,
         useCORS: true,
-        backgroundColor: BRAND.palette.black,
+        backgroundColor: brand.palette.bg,
         logging: false,
         onclone: (clonedDoc: Document) => {
           if (!clonedDoc.getElementById("lookbook-fonts-cloned")) {
@@ -267,7 +270,7 @@ export function LookbookSection({
         },
       });
     },
-    []
+    [brand]
   );
 
   const handleDownloadPdf = useCallback(async () => {
@@ -285,13 +288,13 @@ export function LookbookSection({
         if (i > 0) pdf.addPage();
         pdf.addImage(img, "JPEG", 0, 0, pageWidth, pageHeight);
       }
-      pdf.save(`link-interiors-lookbook-${campaignDate}.pdf`);
+      pdf.save(`${brand.slug}-lookbook-${campaignDate}.pdf`);
     } catch (e) {
       setError("PDF export failed: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setDownloading(null);
     }
-  }, [pages, capturePage, campaignDate]);
+  }, [pages, capturePage, campaignDate, brand.slug]);
 
   const handleDownloadPngs = useCallback(async () => {
     setError(null);
@@ -314,7 +317,7 @@ export function LookbookSection({
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `link-interiors-lookbook-${campaignDate}.zip`;
+      a.download = `${brand.slug}-lookbook-${campaignDate}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -324,7 +327,7 @@ export function LookbookSection({
     } finally {
       setDownloading(null);
     }
-  }, [pages, capturePage, campaignDate]);
+  }, [pages, capturePage, campaignDate, brand.slug]);
 
   const ready = narratives && narratives.length >= productPagesPlan.length;
 
@@ -474,7 +477,7 @@ export function LookbookSection({
                     height: LOOKBOOK_PAGE_HEIGHT,
                   }}
                 >
-                  <LookbookPageView page={page} pageNumber={-1} />
+                  <LookbookPageView page={page} pageNumber={-1} brand={brand} />
                 </div>
                 <div
                   style={{
@@ -516,7 +519,7 @@ export function LookbookSection({
                   height: LOOKBOOK_PAGE_HEIGHT,
                 }}
               >
-                <LookbookPageView page={page} pageNumber={i} />
+                <LookbookPageView page={page} pageNumber={i} brand={brand} />
               </div>
             ))}
           </div>

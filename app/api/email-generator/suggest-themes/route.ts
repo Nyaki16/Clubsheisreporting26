@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServiceClient } from "@/lib/supabase";
+import { getBrand, type Brand } from "@/lib/email-generator/brand";
 import type { ProductInput } from "@/lib/email-generator/types";
 
 export const maxDuration = 60;
-const LINK_INTERIORS_SLUG = "link-interiors";
 
 function checkAuth(request: NextRequest): boolean {
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -31,17 +31,15 @@ interface NoteSummary {
   clientActions?: unknown[];
 }
 
-const SYSTEM_PROMPT = `You are a senior creative director for Link Interiors, a South African luxury interior design and furniture brand based in Johannesburg.
+function buildSystemPrompt(brand: Brand): string {
+  return `You are a senior creative director for ${brand.wordmark}.
+
+About the brand:
+${brand.voice.description}
+
+Tone: ${brand.voice.tone}.
 
 Your job: propose 3 distinct thematic angles for a weekly product email.
-
-Brand voice (for the tone of your proposals and the 'direction' field):
-- Warm, luxurious, elevated — attainable luxury for people who care about their space
-- Magazine editorial, never salesy
-- Short, intentional sentences
-- South African English spelling
-- No exclamation marks, no hype clichés ("transform your home", "game-changer", "elevate")
-- No hashtags, no emojis
 
 Each proposed theme must:
 - Fit the products on offer (their type, style, price range)
@@ -64,6 +62,7 @@ Return a single JSON object. No prose, no markdown fences:
 Rules:
 - Output must be parseable JSON — no trailing commas, no comments
 - Exactly 3 suggestions`;
+}
 
 async function fetchRecentNotes(
   supabase: ReturnType<typeof getServiceClient>,
@@ -102,6 +101,17 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
+    const slug = typeof body?.slug === "string" ? body.slug.trim() : "";
+    if (!slug) {
+      return Response.json({ error: "slug required" }, { status: 400 });
+    }
+    const brand = getBrand(slug);
+    if (!brand) {
+      return Response.json(
+        { error: `Email generator not configured for "${slug}"` },
+        { status: 400 }
+      );
+    }
     const campaignDate =
       typeof body?.campaignDate === "string"
         ? body.campaignDate
@@ -133,10 +143,10 @@ export async function POST(request: NextRequest) {
     const { data: client } = await supabase
       .from("clients")
       .select("id")
-      .eq("slug", LINK_INTERIORS_SLUG)
+      .eq("slug", slug)
       .maybeSingle();
     if (!client) {
-      return Response.json({ error: "Link Interiors client not found" }, { status: 404 });
+      return Response.json({ error: `Client "${slug}" not found` }, { status: 404 });
     }
 
     const notes = await fetchRecentNotes(supabase, client.id as string);
@@ -179,7 +189,7 @@ Propose 3 distinct theme options for this weekly email. Return the JSON only.`;
       model: "claude-sonnet-4-6",
       max_tokens: 1500,
       system: [
-        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        { type: "text", text: buildSystemPrompt(brand), cache_control: { type: "ephemeral" } },
       ],
       messages: [{ role: "user", content: userPrompt }],
     });
