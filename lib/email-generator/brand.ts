@@ -85,7 +85,7 @@ const AWAHOME: Brand = {
     border: "#E5E1D6",
   },
   fonts: {
-    serif: "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+    serif: "'Montserrat', 'Helvetica Neue', Helvetica, Arial, sans-serif",
     sans: "'Montserrat', 'Helvetica Neue', Helvetica, Arial, sans-serif",
     headingsWeight: 400,
   },
