@@ -34,20 +34,22 @@ interface PaystackSubscription {
 
 export async function getPaystackKeys(clientId: string): Promise<string[]> {
   const supabase = getServiceClient();
+  // Some clients have duplicate api_keys rows — limit defensively, then dedupe.
   const { data: rows } = await supabase
     .from("dashboard_data")
     .select("data")
     .eq("client_id", clientId)
     .eq("section", "api_keys")
-    .is("period_id", null);
+    .is("period_id", null)
+    .limit(5);
 
-  const keys: string[] = [];
+  const keys = new Set<string>();
   for (const row of rows || []) {
     const d = row.data as Record<string, string>;
-    if (d?.paystack_secret_key) keys.push(d.paystack_secret_key);
-    if (d?.paystack_secret_key_2) keys.push(d.paystack_secret_key_2);
+    if (d?.paystack_secret_key) keys.add(d.paystack_secret_key);
+    if (d?.paystack_secret_key_2) keys.add(d.paystack_secret_key_2);
   }
-  return keys;
+  return Array.from(keys);
 }
 
 export async function fetchPaystackTransactions(

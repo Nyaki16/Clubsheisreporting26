@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Calendar, RefreshCw, FileText } from "lucide-react";
+import { ChevronDown, Calendar, RefreshCw, FileText, CalendarPlus, X } from "lucide-react";
 import Link from "next/link";
 import { KeyDates } from "./KeyDates";
 
@@ -30,6 +30,14 @@ export function DashboardHeader({
 }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [creatingPeriod, setCreatingPeriod] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createYear, setCreateYear] = useState(() => new Date().getFullYear());
+  const [createMonth, setCreateMonth] = useState(() => new Date().getMonth() + 1);
+  const [createResult, setCreateResult] = useState<string | null>(null);
+
+  // Admin signal: dashboard-shell only passes clients[] when admin.
+  const isAdmin = clients.length > 0;
 
   async function handleSync() {
     setSyncing(true);
@@ -62,6 +70,50 @@ export function DashboardHeader({
     }
     setSyncing(false);
   }
+
+  async function handleCreatePeriod() {
+    setCreatingPeriod(true);
+    setCreateResult(null);
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
+        body: JSON.stringify({ year: createYear, month: createMonth }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const errs = (data.results || [])
+          .flatMap((r: { client: string; errors: string[] }) =>
+            (r.errors || []).map((e: string) => `${r.client}: ${e}`)
+          );
+        const totalSections = (data.results || []).reduce(
+          (s: number, r: { sections: string[] }) => s + (r.sections?.length || 0),
+          0
+        );
+        if (totalSections === 0 && errs.length > 0) {
+          setCreateResult(errs[0].slice(0, 80));
+        } else {
+          setCreateResult(`Created · ${totalSections} sections`);
+          setTimeout(() => window.location.reload(), 1500);
+        }
+      } else {
+        setCreateResult("Failed");
+      }
+    } catch {
+      setCreateResult("Error");
+    }
+    setCreatingPeriod(false);
+  }
+
+  const monthOptions = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const yearOptions = (() => {
+    const y = new Date().getFullYear();
+    return [y - 1, y, y + 1];
+  })();
+
   return (
     <header
       className="w-full text-white px-6 py-6 md:px-10 md:py-8"
@@ -99,6 +151,70 @@ export function DashboardHeader({
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
                 {syncing ? "Syncing..." : syncResult || "Sync Data"}
               </button>
+              {isAdmin && (
+                <div className="relative">
+                  <button
+                    onClick={() => setCreateOpen((v) => !v)}
+                    className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors"
+                    title="Create a new reporting period and sync all clients"
+                  >
+                    <CalendarPlus size={12} />
+                    {createOpen ? "Hide" : "Create Period"}
+                  </button>
+                  {createOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg p-3 z-50 text-gray-900">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold">Create reporting period</span>
+                        <button
+                          onClick={() => setCreateOpen(false)}
+                          className="text-gray-400 hover:text-gray-700"
+                          aria-label="Close"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <select
+                          value={createMonth}
+                          onChange={(e) => setCreateMonth(parseInt(e.target.value, 10))}
+                          className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#4A1942]"
+                        >
+                          {monthOptions.map((m, i) => (
+                            <option key={m} value={i + 1}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={createYear}
+                          onChange={(e) => setCreateYear(parseInt(e.target.value, 10))}
+                          className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#4A1942]"
+                        >
+                          {yearOptions.map((y) => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={handleCreatePeriod}
+                        disabled={creatingPeriod}
+                        className="w-full inline-flex items-center justify-center gap-1.5 bg-[#4A1942] hover:bg-[#3a1335] text-white rounded px-3 py-1.5 text-xs disabled:opacity-50"
+                      >
+                        {creatingPeriod ? (
+                          <RefreshCw size={12} className="animate-spin" />
+                        ) : (
+                          <CalendarPlus size={12} />
+                        )}
+                        {creatingPeriod ? "Creating…" : "Create + Sync"}
+                      </button>
+                      {createResult && (
+                        <div className="mt-2 text-[11px] text-gray-700">{createResult}</div>
+                      )}
+                      <div className="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                        Creates the period if missing and syncs Paystack, Meta Ads, FB, IG and GHL for every client. Locked months (Jan/Feb/Mar 2026) are skipped.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {slug && (
                 <Link
                   href={`/dashboard/${slug}/report${currentPeriodId ? `?period=${currentPeriodId}` : ""}`}
