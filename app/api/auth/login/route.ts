@@ -71,11 +71,16 @@ export async function POST(request: NextRequest) {
         .eq("section", "client_access");
     }
 
+    const isProd = process.env.NODE_ENV === "production";
     const cookieStore = await cookies();
     cookieStore.set("client_session", JSON.stringify({ clientId: client.id, slug: client.slug }), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      // SameSite=None + Partitioned so client sessions also work inside the
+      // Ghutte iframe (cross-site). Partitioned (CHIPS) survives third-party
+      // cookie blocking in Chrome.
+      sameSite: isProd ? "none" : "lax",
+      partitioned: isProd,
       maxAge: 60 * 60 * 24 * 30,
       path: "/",
     });

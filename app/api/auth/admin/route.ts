@@ -10,11 +10,16 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Invalid password" }, { status: 401 });
     }
 
+    const isProd = process.env.NODE_ENV === "production";
     const cookieStore = await cookies();
     cookieStore.set("admin_session", "true", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      // SameSite=None + Partitioned so the cookie is sent when the dashboard
+      // runs inside the Ghutte iframe (cross-site context). Partitioned (CHIPS)
+      // keeps it working even when Chrome blocks third-party cookies.
+      sameSite: isProd ? "none" : "lax",
+      partitioned: isProd,
       maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
