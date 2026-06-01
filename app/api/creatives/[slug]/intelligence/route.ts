@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { authorizeForSlug } from "@/lib/meta/auth";
-import { resolveClientBySlug, getMetaClientConfig } from "@/lib/meta/config";
-import { fetchInsightsByAd, fetchAds, fetchAdSets, fetchCampaigns, MetaApiError } from "@/lib/meta/queries";
-import { buildHierarchy } from "@/lib/meta/transform";
-import type { AdRow } from "@/lib/meta/types";
+import { resolveClientBySlug } from "@/lib/meta/config";
+import type { AdRow, CampaignsResponse } from "@/lib/meta/types";
 import { getServiceClient } from "@/lib/supabase";
 import { CREATIVE_INTELLIGENCE_SYSTEM, buildUserMessage } from "@/lib/prompts/creative-intelligence";
 
@@ -12,23 +10,16 @@ export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-4-20250514";
 const SECTION = "metaIntelligence";
+const CAMPAIGNS_SECTION = "metaCampaigns";
 
 interface RequestBody {
-  date_range: { start: string; end: string };
+  date_range?: { start: string; end: string };
 }
 
-function flatten(campaigns: ReturnType<typeof buildHierarchy>): AdRow[] {
+function flattenCampaigns(campaigns: CampaignsResponse["campaigns"]): AdRow[] {
   const out: AdRow[] = [];
   for (const c of campaigns) for (const s of c.adSets) for (const a of s.ads) out.push(a);
   return out;
-}
-
-function adAgeDays(adId: string, createdByAdId: Map<string, string | undefined>, endDate: string): number {
-  const created = createdByAdId.get(adId);
-  if (!created) return 0;
-  const c = new Date(created).getTime();
-  const e = new Date(endDate).getTime();
-  return Math.max(0, Math.floor((e - c) / (24 * 3600 * 1000)));
 }
 
 // GET = read latest cached intelligence (cheap, no Claude call)
@@ -61,44 +52,36 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     const auth = authorizeForSlug(request, slug);
     if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = (await request.json()) as RequestBody;
-    if (!body?.date_range?.start || !body?.date_range?.end) {
-      return Response.json({ error: "date_range.start and date_range.end required" }, { status: 400 });
-    }
+    const body = (await request.json().catch(() => ({}))) as RequestBody;
 
     const client = await resolveClientBySlug(slug);
     if (!client) return Response.json({ error: "Client not found" }, { status: 404 });
 
-    const config = await getMetaClientConfig(client.id);
-    if (!config.metaAdAccountId) {
-      return Response.json({ error: "Meta ad account not configured for this client." }, { status: 400 });
-    }
-
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return Response.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
 
-    const range = body.date_range;
+    // Read the synced metaCampaigns snapshot rather than calling Meta live.
+    const supabase = getServiceClient();
+    const { data: campRow } = await supabase
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", client.id)
+      .eq("section", CAMPAIGNS_SECTION)
+      .is("period_id", null)
+      .limit(1)
+      .maybeSingle();
 
-    const [insights, ads, adSets, campaigns] = await Promise.all([
-      fetchInsightsByAd(config.metaAdAccountId, range),
-      fetchAds(config.metaAdAccountId),
-      fetchAdSets(config.metaAdAccountId),
-      fetchCampaigns(config.metaAdAccountId),
-    ]);
-    const insightsByAdId = new Map(insights.map((r) => [r.ad_id, r]));
-    const createdByAdId = new Map(ads.map((a) => [a.id, a.created_time]));
+    if (!campRow?.data) {
+      return Response.json(
+        { error: "No Meta data synced for this client yet. Run Sync Data first." },
+        { status: 422 },
+      );
+    }
 
-    const hierarchy = buildHierarchy({
-      insightsByAdId,
-      ads,
-      adSets,
-      campaigns,
-      revenueSourceActive: config.revenueSource === "meta",
-      conversionEvent: config.conversionEvent,
-    });
-    const allAds = flatten(hierarchy);
-
-    const hasRevenue = config.revenueSource === "meta";
+    const snapshot = campRow.data as CampaignsResponse;
+    const range = body.date_range || snapshot.dateRange;
+    const allAds = flattenCampaigns(snapshot.campaigns || []);
+    const hasRevenue = snapshot.revenueSource === "meta";
 
     const scoreForWinning = (a: AdRow) => (hasRevenue ? a.roas ?? -Infinity : a.cpa === null ? Infinity : -a.cpa);
     const scoreForLosing = (a: AdRow) => (hasRevenue ? a.roas ?? Infinity : a.cpa === null ? -Infinity : a.cpa);
@@ -106,9 +89,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     const eligibleWinners = allAds.filter((a) => a.impressions >= 100);
     const winners = [...eligibleWinners].sort((a, b) => scoreForWinning(b) - scoreForWinning(a)).slice(0, 3);
 
-    const eligibleLosers = allAds.filter(
-      (a) => a.impressions >= 1000 && adAgeDays(a.id, createdByAdId, range.end) >= 7,
-    );
+    // Note: no creation-date filter (Windsor doesn't expose ad created_time).
+    // The 1,000-impression threshold filters out brand-new ads in practice.
+    const eligibleLosers = allAds.filter((a) => a.impressions >= 1000);
     const losers = [...eligibleLosers].sort((a, b) => scoreForLosing(b) - scoreForLosing(a)).slice(0, 3);
 
     if (winners.length === 0 && losers.length === 0) {
@@ -233,7 +216,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     };
 
     // Cache. One row per client; overwritten each generation.
-    const supabase = getServiceClient();
     const { data: existing } = await supabase
       .from("dashboard_data")
       .select("id")
@@ -241,7 +223,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
       .eq("section", SECTION)
       .is("period_id", null)
       .limit(1)
-      .single();
+      .maybeSingle();
     if (existing) {
       await supabase
         .from("dashboard_data")
@@ -258,10 +240,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
 
     return Response.json(result);
   } catch (e) {
-    if (e instanceof MetaApiError) {
-      console.error("Meta API error:", e.message);
-      return Response.json({ error: e.message }, { status: e.status >= 400 && e.status < 600 ? e.status : 502 });
-    }
     const message = e instanceof Error ? e.message : String(e);
     console.error("Intelligence route error:", message);
     if (message.includes("rate_limit") || message.includes("429")) {

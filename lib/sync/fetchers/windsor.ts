@@ -84,6 +84,70 @@ export async function fetchMetaAds(
   }
 }
 
+export interface WindsorAdRow {
+  ad_id: string;
+  ad_name: string;
+  adset_name: string;
+  campaign: string;
+  effective_status: string;
+  spend: number;
+  impressions: number;
+  reach: number;
+  frequency: number;
+  clicks: number;
+  link_clicks: number;
+  landing_page_views: number;
+  purchases: number;
+  purchase_revenue: number;
+  video_3sec_views: number;
+}
+
+/**
+ * Pulls ad-level Meta data via Windsor for the given accounts and date range.
+ * Returns one row per (ad_id × day) — caller should aggregate.
+ */
+export async function fetchMetaAdLevel(
+  accountIds: string[],
+  dateFrom: string,
+  dateTo: string,
+): Promise<WindsorAdRow[]> {
+  if (!accountIds.length) return [];
+  try {
+    const rows = await windsorQuery(
+      "source,account_id,ad_id,ad_name,adset_name,campaign,effective_status,spend,impressions,reach,frequency,clicks,link_clicks,landing_page_views,purchases,purchase_revenue,video_3sec_views",
+      dateFrom,
+      dateTo,
+    );
+    return rows
+      .filter(
+        (r) =>
+          String(r.source) === "facebook" &&
+          accountIds.includes(String(r.account_id || "")) &&
+          r.ad_id,
+      )
+      .map((r) => ({
+        ad_id: String(r.ad_id),
+        ad_name: String(r.ad_name || "(unnamed)"),
+        adset_name: String(r.adset_name || "(unnamed ad set)"),
+        campaign: String(r.campaign || "(unnamed campaign)"),
+        effective_status: String(r.effective_status || ""),
+        spend: Number(r.spend) || 0,
+        impressions: Number(r.impressions) || 0,
+        reach: Number(r.reach) || 0,
+        frequency: Number(r.frequency) || 0,
+        clicks: Number(r.clicks) || 0,
+        link_clicks: Number(r.link_clicks) || 0,
+        landing_page_views: Number(r.landing_page_views) || 0,
+        purchases: Number(r.purchases) || 0,
+        purchase_revenue: Number(r.purchase_revenue) || 0,
+        video_3sec_views: Number(r.video_3sec_views) || 0,
+      }));
+  } catch (e) {
+    console.error("fetchMetaAdLevel error:", e);
+    return [];
+  }
+}
+
 export async function fetchFacebookOrganic(
   pageId: string,
   dateFrom: string,

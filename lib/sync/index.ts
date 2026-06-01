@@ -2,7 +2,7 @@ import { getServiceClient } from "@/lib/supabase";
 import { CLIENT_ACCOUNTS } from "@/lib/clients";
 import { buildWindsorDateRange } from "@/lib/windsor";
 import { FetchedClientData, MonthData } from "./types";
-import { fetchMetaAds, fetchFacebookOrganic, fetchInstagramData, fetchGHLRevenue } from "./fetchers/windsor";
+import { fetchMetaAds, fetchMetaAdLevel, fetchFacebookOrganic, fetchInstagramData, fetchGHLRevenue } from "./fetchers/windsor";
 import { getPaystackKeys, fetchPaystackTransactions, fetchPaystackSubscriptions } from "./fetchers/paystack";
 import { buildOverview } from "./builders/overview";
 import { buildMeta } from "./builders/meta";
@@ -10,6 +10,7 @@ import { buildSocial } from "./builders/social";
 import { buildPaystackSection } from "./builders/paystack-section";
 import { buildInsights } from "./builders/insights";
 import { buildNextMonth } from "./builders/next-month";
+import { buildMetaCampaigns } from "./builders/meta-campaigns";
 
 interface SyncResult {
   client: string;
@@ -183,6 +184,21 @@ export async function runMonthlySync(year: number, month: number): Promise<SyncR
       await upsertSection(client.uuid, period!.id, "nextMonth", nextMonth);
       result.sections.push("nextMonth");
 
+      // Meta campaign hierarchy + creative intelligence data.
+      // Stored at period_id=NULL — a single rolling snapshot per client for the table.
+      if (client.facebookAds?.length) {
+        try {
+          const adRows = await fetchMetaAdLevel(client.facebookAds, dateFrom, dateTo);
+          const metaCampaigns = buildMetaCampaigns(adRows, { start: dateFrom, end: dateTo });
+          if (metaCampaigns) {
+            await upsertGlobalSection(client.uuid, "metaCampaigns", metaCampaigns);
+            result.sections.push("metaCampaigns");
+          }
+        } catch (e) {
+          result.errors.push(`metaCampaigns: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
     } catch (e) {
       result.errors.push(String(e));
     }
@@ -334,4 +350,38 @@ export async function upsertSection(
       { onConflict: "client_id,period_id,section" }
     );
   if (error) throw error;
+}
+
+/**
+ * Upsert a section with period_id = NULL (global, not per-period).
+ * Postgres treats NULL as distinct from NULL for unique constraints, so we can't
+ * use the upsert helper — emulate it with select-then-update-or-insert.
+ */
+export async function upsertGlobalSection(
+  clientId: string,
+  section: string,
+  data: unknown
+) {
+  const supabase = getServiceClient();
+  const { data: existing } = await supabase
+    .from("dashboard_data")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("section", section)
+    .is("period_id", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("dashboard_data")
+      .update({ data, updated_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("dashboard_data")
+      .insert({ client_id: clientId, period_id: null, section, data });
+    if (error) throw error;
+  }
 }
