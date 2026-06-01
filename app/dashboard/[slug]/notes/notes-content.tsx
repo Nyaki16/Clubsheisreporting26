@@ -45,15 +45,7 @@ const priorityStyles = {
   low: { bg: "#F3F4F6", text: "#6B7280" },
 };
 
-const CLICKUP_LIST_URLS: Record<string, string> = {
-  "club-she-is": "https://app.clickup.com/90121487936/v/li/901216333346",
-  "palesa-dooms": "https://app.clickup.com/90121487936/v/li/901216332808",
-  "wisdom-and-wellness": "https://app.clickup.com/90121487936/v/li/901216193017",
-  "purpose-for-impact": "https://app.clickup.com/90121487936/v/li/901216190500",
-  "link-interiors": "https://app.clickup.com/90121487936/v/li/901216189889",
-  "awahome": "https://app.clickup.com/90121487936/v/li/901216094961",
-  "gibs-eda": "https://app.clickup.com/90121487936/v/li/901216237109",
-};
+const TRACKER_BASE_URL = process.env.NEXT_PUBLIC_TRACKER_URL || "https://clubsheis-tracker.vercel.app";
 
 const statusCycle: Record<string, "pending" | "in-progress" | "done"> = {
   pending: "in-progress",
@@ -71,9 +63,9 @@ export function NotesContent({ slug }: { slug: string }) {
   const [showUpload, setShowUpload] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [notes, setNotes] = useState<NotesData | null>(null);
-  const [clickupPushing, setClickupPushing] = useState(false);
-  const [clickupPushed, setClickupPushed] = useState(false);
-  const [clickupResult, setClickupResult] = useState<{ created: number; total: number } | null>(null);
+  const [trackerPushing, setTrackerPushing] = useState(false);
+  const [trackerPushed, setTrackerPushed] = useState(false);
+  const [trackerResult, setTrackerResult] = useState<{ created: number; total: number; clientId?: string; jobId?: string } | null>(null);
 
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -175,8 +167,8 @@ export function NotesContent({ slug }: { slug: string }) {
     reader.readAsText(file);
   }
 
-  async function pushToClickUp() {
-    if (!displayNotes || clickupPushing || clickupPushed) return;
+  async function pushToTracker() {
+    if (!displayNotes || trackerPushing || trackerPushed) return;
     const allActions = [
       ...(displayNotes.agencyActions || []).map((a) => ({
         description: a.description,
@@ -195,25 +187,30 @@ export function NotesContent({ slug }: { slug: string }) {
     ];
     if (allActions.length === 0) return;
 
-    setClickupPushing(true);
+    setTrackerPushing(true);
     try {
-      const res = await fetch("/api/clickup-tasks", {
+      const res = await fetch("/api/push-to-tracker", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientSlug: slug, actions: allActions }),
       });
       const result = await res.json();
       if (!res.ok) {
-        alert("Failed to push to ClickUp: " + (result.error || "Unknown error"));
-        setClickupPushing(false);
+        alert("Failed to push to Tracker: " + (result.error || "Unknown error"));
+        setTrackerPushing(false);
         return;
       }
-      setClickupResult({ created: result.created, total: result.total });
-      setClickupPushed(true);
+      setTrackerResult({
+        created: result.created,
+        total: result.total,
+        clientId: result.clientId,
+        jobId: result.jobId,
+      });
+      setTrackerPushed(true);
     } catch (e) {
-      alert("Error pushing to ClickUp: " + String(e));
+      alert("Error pushing to Tracker: " + String(e));
     }
-    setClickupPushing(false);
+    setTrackerPushing(false);
   }
 
   function exportNotes() {
@@ -692,24 +689,24 @@ export function NotesContent({ slug }: { slug: string }) {
             )}
           </div>
 
-          {/* Push to ClickUp */}
+          {/* Push to Tracker */}
           {((displayNotes.agencyActions?.length || 0) > 0 || (displayNotes.clientActions?.length || 0) > 0) && (
             <div className="flex items-center gap-4 flex-wrap">
               <button
-                onClick={pushToClickUp}
-                disabled={clickupPushing || clickupPushed}
+                onClick={pushToTracker}
+                disabled={trackerPushing || trackerPushed}
                 className={`flex items-center gap-2 px-5 py-2.5 font-medium text-sm rounded-lg transition-all ${
-                  clickupPushed
+                  trackerPushed
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
-                    : "bg-[#7B68EE] text-white hover:bg-[#6A5ACD] disabled:opacity-50"
+                    : "bg-[#4A1942] text-white hover:bg-[#3A1335] disabled:opacity-50"
                 }`}
               >
-                {clickupPushed ? (
+                {trackerPushed ? (
                   <>
                     <CheckCircle size={16} />
-                    Pushed to ClickUp ✓
+                    Pushed to Tracker ✓
                   </>
-                ) : clickupPushing ? (
+                ) : trackerPushing ? (
                   <>
                     <ExternalLink size={16} className="animate-pulse" />
                     Creating tasks...
@@ -717,18 +714,18 @@ export function NotesContent({ slug }: { slug: string }) {
                 ) : (
                   <>
                     <ExternalLink size={16} />
-                    Push to ClickUp
+                    Push to Tracker
                   </>
                 )}
               </button>
               <a
-                href={CLICKUP_LIST_URLS[slug] || "#"}
+                href={trackerResult?.clientId ? `${TRACKER_BASE_URL}/clients/${trackerResult.clientId}` : TRACKER_BASE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-5 py-2.5 font-medium text-sm rounded-lg border border-[#7B68EE] text-[#7B68EE] hover:bg-[#7B68EE]/5 transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 font-medium text-sm rounded-lg border border-[#4A1942] text-[#4A1942] hover:bg-[#4A1942]/5 transition-all"
               >
                 <ExternalLink size={16} />
-                Open in ClickUp
+                {trackerResult?.clientId ? "Open new job in Tracker" : "Open Tracker"}
               </a>
               <button
                 onClick={exportNotes}
@@ -737,9 +734,9 @@ export function NotesContent({ slug }: { slug: string }) {
                 <Download size={16} />
                 Export Notes
               </button>
-              {clickupResult && (
+              {trackerResult && (
                 <span className="text-sm text-emerald-600">
-                  {clickupResult.created} of {clickupResult.total} tasks created
+                  {trackerResult.created} of {trackerResult.total} tasks created
                 </span>
               )}
             </div>
