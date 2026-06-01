@@ -216,5 +216,6 @@ export function buildMetaCampaigns(
     revenueSourceMock: false,
     totals: { ...totals, roas },
     dateRange,
+    source: "windsor",
   };
 }

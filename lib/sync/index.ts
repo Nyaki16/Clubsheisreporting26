@@ -186,13 +186,21 @@ export async function runMonthlySync(year: number, month: number): Promise<SyncR
 
       // Meta campaign hierarchy + creative intelligence data.
       // Stored at period_id=NULL — a single rolling snapshot per client for the table.
+      // Skip if richer MCP-sourced data already exists (Windsor doesn't expose conversions,
+      // hook rate, etc. — overwriting would regress the dashboard).
       if (client.facebookAds?.length) {
         try {
-          const adRows = await fetchMetaAdLevel(client.facebookAds, dateFrom, dateTo);
-          const metaCampaigns = buildMetaCampaigns(adRows, { start: dateFrom, end: dateTo });
-          if (metaCampaigns) {
-            await upsertGlobalSection(client.uuid, "metaCampaigns", metaCampaigns);
-            result.sections.push("metaCampaigns");
+          const existingMeta = await loadGlobalSection(client.uuid, "metaCampaigns");
+          const existingSource = (existingMeta as { source?: string } | null)?.source;
+          if (existingSource === "mcp") {
+            result.sections.push("metaCampaigns (skipped — MCP data preserved)");
+          } else {
+            const adRows = await fetchMetaAdLevel(client.facebookAds, dateFrom, dateTo);
+            const metaCampaigns = buildMetaCampaigns(adRows, { start: dateFrom, end: dateTo });
+            if (metaCampaigns) {
+              await upsertGlobalSection(client.uuid, "metaCampaigns", metaCampaigns);
+              result.sections.push("metaCampaigns");
+            }
           }
         } catch (e) {
           result.errors.push(`metaCampaigns: ${e instanceof Error ? e.message : String(e)}`);
@@ -350,6 +358,25 @@ export async function upsertSection(
       { onConflict: "client_id,period_id,section" }
     );
   if (error) throw error;
+}
+
+/**
+ * Read a global (period_id = NULL) section. Returns the data blob or null.
+ */
+export async function loadGlobalSection(
+  clientId: string,
+  section: string
+): Promise<unknown | null> {
+  const supabase = getServiceClient();
+  const { data: row } = await supabase
+    .from("dashboard_data")
+    .select("data")
+    .eq("client_id", clientId)
+    .eq("section", section)
+    .is("period_id", null)
+    .limit(1)
+    .maybeSingle();
+  return row?.data ?? null;
 }
 
 /**

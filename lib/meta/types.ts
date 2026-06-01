@@ -79,6 +79,12 @@ export interface CampaignsResponse {
   synced?: boolean;
   /** ISO timestamp of the last sync, when `synced` is true. */
   syncedAt?: string;
+  /**
+   * Where this snapshot was sourced from. "mcp" is richer (includes purchases, hook rate,
+   * full action breakdowns); "windsor" only has the basics (spend, impressions, clicks).
+   * Used by runMonthlySync to skip overwriting MCP data with thinner Windsor data.
+   */
+  source?: "mcp" | "windsor";
 }
 
 // Creative intelligence ---------------------------------------------------

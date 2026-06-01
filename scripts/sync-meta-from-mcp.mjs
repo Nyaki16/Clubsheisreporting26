@@ -247,6 +247,7 @@ async function syncFile(slug) {
     revenueSourceMock: false,
     totals: computeTotals(campaigns),
     dateRange: input.dateRange,
+    source: "mcp",
   };
   const action = await upload(input.clientId, payload);
   const adCount = campaigns.reduce((n, c) => n + c.adSets.reduce((m, s) => m + s.ads.length, 0), 0);
