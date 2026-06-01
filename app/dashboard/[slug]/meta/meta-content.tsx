@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
@@ -7,9 +8,13 @@ import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { MetaData } from "@/types/dashboard";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { CampaignPerformanceTable } from "@/components/meta/CampaignPerformanceTable";
+import { CreativeIntelligence } from "@/components/meta/CreativeIntelligence";
+import { DateRangePicker, rangeFromPreset, type DateRangeValue } from "@/components/meta/DateRangePicker";
 
 export function MetaContent({ slug }: { slug: string }) {
   const { data, loading } = useDashboardData<MetaData>(slug, "meta");
+  const [range, setRange] = useState<DateRangeValue>(() => rangeFromPreset("30d"));
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="No Meta Ads data available. This client may not have Meta Ads connected." />;
@@ -87,6 +92,21 @@ export function MetaContent({ slug }: { slug: string }) {
           <CampaignSpendChart campaigns={data.campaigns.map((c) => ({ name: c.name, spend: c.spend }))} />
         </>
       )}
+
+      <div className="pt-2 border-t border-gray-200">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+          <div>
+            <h2 className="font-serif text-xl font-semibold text-gray-900">Ad-level performance & creative intelligence</h2>
+            <p className="text-sm text-gray-500">Live from the Meta Marketing API. Date range applies to both sections below.</p>
+          </div>
+          <DateRangePicker value={range} onChange={setRange} />
+        </div>
+
+        <div className="space-y-8">
+          <CampaignPerformanceTable slug={slug} hasMetaAds={true} range={range} />
+          <CreativeIntelligence slug={slug} hasMetaAds={true} range={range} />
+        </div>
+      </div>
     </div>
   );
 }

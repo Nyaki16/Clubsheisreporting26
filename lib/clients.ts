@@ -29,6 +29,7 @@ export const CLIENT_ACCOUNTS: ClientAccountMapping[] = [
     name: "GIBS EDA",
     slug: "gibs-eda",
     color: "#1F2937",
+    facebookAds: ["863888058621605"],
   },
   {
     uuid: "e5555d53-77ed-43fe-995b-d96ce6e772a7",
@@ -58,6 +59,7 @@ export const CLIENT_ACCOUNTS: ClientAccountMapping[] = [
     name: "Purpose for Impact",
     slug: "purpose-for-impact",
     color: "#0D9488",
+    facebookAds: ["612232814892038"],
     facebookOrganic: "602790659574747",
     instagram: "17841469744147081",
     goHighLevel: "P2GxuKbjPEU0kQlXrCqf",

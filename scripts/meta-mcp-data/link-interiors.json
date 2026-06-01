@@ -1,0 +1,32 @@
+{
+  "clientId": "e5555d53-77ed-43fe-995b-d96ce6e772a7",
+  "adAccountId": "744119155184115",
+  "dateRange": { "start": "2026-04-29", "end": "2026-05-28" },
+  "revenueSource": "none",
+  "conversionField": "actions:omni_purchase",
+  "campaigns": [
+    { "id": "120243503030370185", "name": "April 2026 Ads", "effective_status": "PAUSED" },
+    { "id": "120243759536390185", "name": "AirBnB Ad Campaign – April Campaign", "effective_status": "PAUSED" },
+    { "id": "120240647965670185", "name": "AirBnB Ad Campaign", "effective_status": "PAUSED" },
+    { "id": "120240647911620185", "name": "February Ads 2026", "effective_status": "PAUSED" }
+  ],
+  "adsets": [
+    { "id": "120243503030380185", "name": "New April Ads", "campaign_id": "120243503030370185", "effective_status": "PAUSED" },
+    { "id": "120243759536420185", "name": "AirBnB Ad Campaign - April Campaign", "campaign_id": "120243759536390185", "effective_status": "PAUSED" },
+    { "id": "120240647966250185", "name": "AirBnB Ad Campaign", "campaign_id": "120240647965670185", "effective_status": "PAUSED" },
+    { "id": "120240647912370185", "name": "Ad set 1", "campaign_id": "120240647911620185", "effective_status": "PAUSED" }
+  ],
+  "ads": [
+    { "id": "120243519009900185", "name": "Skip the waiting line & shop now static", "campaign_id": "120243503030370185", "adset_id": "120243503030380185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR714.41", "impressions": "13,584", "reach": "10,160", "frequency": "1.34", "3_second_video_plays": "19", "actions:link_click": "1,139", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243759536400185", "name": "Ad 1  - Static - Book A free Consultation", "campaign_id": "120243759536390185", "adset_id": "120243759536420185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR543.97", "impressions": "10,213", "reach": "7,398", "frequency": "1.38", "3_second_video_plays": "Not available", "actions:link_click": "345", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120240647986340185", "name": "Ad 4-  Air BnB Video ad", "campaign_id": "120240647965670185", "adset_id": "120240647966250185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR499.74", "impressions": "13,695", "reach": "9,395", "frequency": "1.46", "3_second_video_plays": "3,767", "actions:link_click": "710", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120240647917260185", "name": "Ad 3 - Custom Design Couch", "campaign_id": "120240647911620185", "adset_id": "120240647912370185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR198.06", "impressions": "2,731", "reach": "1,957", "frequency": "1.40", "3_second_video_plays": "Not available", "actions:link_click": "97", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120240647918830185", "name": "Ad 1 - Light Statics", "campaign_id": "120240647911620185", "adset_id": "120240647912370185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR174.26", "impressions": "2,852", "reach": "2,122", "frequency": "1.34", "3_second_video_plays": "Not available", "actions:link_click": "91", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120240647929600185", "name": "Ad 4 - Lights Video ad", "campaign_id": "120240647911620185", "adset_id": "120240647912370185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR127.52", "impressions": "2,198", "reach": "1,806", "frequency": "1.22", "3_second_video_plays": "524", "actions:link_click": "77", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243847646290185", "name": "Lights  Carousels with prices", "campaign_id": "120243503030370185", "adset_id": "120243503030380185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR19.37", "impressions": "339", "reach": "312", "frequency": "1.09", "3_second_video_plays": "Not available", "actions:link_click": "13", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243850592800185", "name": "Coffee table  Carousels with prices", "campaign_id": "120243503030370185", "adset_id": "120243503030380185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR5.35", "impressions": "114", "reach": "110", "frequency": "1.04", "3_second_video_plays": "Not available", "actions:link_click": "4", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243851080970185", "name": "Dining set carousel with prices", "campaign_id": "120243503030370185", "adset_id": "120243503030380185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR5.09", "impressions": "94", "reach": "85", "frequency": "1.11", "3_second_video_plays": "Not available", "actions:link_click": "5", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243769571770185", "name": "Now on Sale Dining Chairs - Static", "campaign_id": "120243503030370185", "adset_id": "120243503030380185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR2.56", "impressions": "39", "reach": "35", "frequency": "1.11", "3_second_video_plays": "Not available", "actions:link_click": "4", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
+    { "id": "120243772445330185", "name": "Ad 2 -  Air BnB AI Pictures", "campaign_id": "120243759536390185", "adset_id": "120243759536420185", "effective_status": "CAMPAIGN_PAUSED", "amount_spent": "ZAR1.38", "impressions": "17", "reach": "16", "frequency": "1.06", "3_second_video_plays": "Not available", "actions:link_click": "2", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" }
+  ]
+}
