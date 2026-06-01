@@ -57,40 +57,7 @@ export function MetaContent({ slug }: { slug: string }) {
       )}
 
       {data.campaigns && data.campaigns.length > 0 && (
-        <>
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Campaign Performance</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 pr-4 text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Spend</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Impressions</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Clicks</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">CTR</th>
-                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">CPC</th>
-                    <th className="text-right py-2 pl-3 text-xs font-medium text-gray-500 uppercase">Reach</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.campaigns.map((c) => (
-                    <tr key={c.name} className="border-b border-gray-100 last:border-0">
-                      <td className="py-3 pr-4 font-medium text-gray-900">{c.name}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">R {(c.spend || 0).toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{(c.impressions || 0).toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{(c.clicks || 0).toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.ctr || "—"}</td>
-                      <td className="py-3 px-3 text-right text-gray-700">{c.cpc || "—"}</td>
-                      <td className="py-3 pl-3 text-right text-gray-700">{(c.reach || 0).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <CampaignSpendChart campaigns={data.campaigns.map((c) => ({ name: c.name, spend: c.spend }))} />
-        </>
+        <CampaignSpendChart campaigns={data.campaigns.map((c) => ({ name: c.name, spend: c.spend }))} />
       )}
 
       <div className="pt-2 border-t border-gray-200">
