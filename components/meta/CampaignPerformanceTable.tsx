@@ -54,7 +54,8 @@ function fmtNum(n: number): string {
   return n.toLocaleString("en-ZA");
 }
 function fmtMoney(n: number): string {
-  return `R ${Math.round(n).toLocaleString("en-ZA")}`;
+  // Non-breaking space between "R" and the number so values never wrap mid-amount.
+  return `R ${Math.round(n).toLocaleString("en-ZA")}`;
 }
 function fmtPct(n: number, digits = 1): string {
   return `${(n * 100).toFixed(digits)}%`;
@@ -90,29 +91,69 @@ function sortRows<T extends AnyRow>(rows: T[], key: SortKey, dir: 1 | -1, hasRev
   });
 }
 
+// Which metric columns have at least one non-zero / non-null value across the dataset.
+// Used to hide columns Windsor isn't populating (LPV, conv, revenue, etc.) so the table
+// shows only signal.
+interface ColumnVisibility {
+  landingPageViews: boolean;
+  conversions: boolean;
+  revenue: boolean;
+  roasOrCpa: boolean;
+  hookRate: boolean;
+}
+
+function computeVisibility(campaigns: CampaignRow[]): ColumnVisibility {
+  const v: ColumnVisibility = {
+    landingPageViews: false,
+    conversions: false,
+    revenue: false,
+    roasOrCpa: false,
+    hookRate: false,
+  };
+  const walk = (row: AnyRow) => {
+    if (row.landingPageViews > 0) v.landingPageViews = true;
+    if (row.conversions > 0) v.conversions = true;
+    if (row.revenue !== null && row.revenue > 0) v.revenue = true;
+    if (row.roas !== null || row.cpa !== null) v.roasOrCpa = true;
+    if (row.hookRate !== null && row.hookRate > 0) v.hookRate = true;
+  };
+  for (const c of campaigns) {
+    walk(c);
+    for (const s of c.adSets) {
+      walk(s);
+      for (const a of s.ads) walk(a);
+    }
+  }
+  return v;
+}
+
 interface MetricCellsProps {
   row: AnyRow;
   hasRevenue: boolean;
+  visible: ColumnVisibility;
 }
-function MetricCells({ row, hasRevenue }: MetricCellsProps) {
+function MetricCells({ row, hasRevenue, visible }: MetricCellsProps) {
+  const cellCls = "py-2 px-3 text-right tabular-nums text-gray-700 whitespace-nowrap";
   return (
     <>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtMoney(row.spend)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtNum(row.impressions)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtNum(row.reach)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{row.frequency.toFixed(2)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtNum(row.linkClicks)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtNum(row.landingPageViews)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">{fmtNum(row.conversions)}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">
-        {row.revenue === null ? "—" : fmtMoney(row.revenue)}
-      </td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">
-        {hasRevenue ? fmtRatio(row.roas) : row.cpa === null ? "—" : fmtMoney(row.cpa)}
-      </td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-700">
-        {row.hookRate === null ? "—" : fmtPct(row.hookRate)}
-      </td>
+      <td className={cellCls}>{fmtMoney(row.spend)}</td>
+      <td className={cellCls}>{fmtNum(row.impressions)}</td>
+      <td className={cellCls}>{fmtNum(row.reach)}</td>
+      <td className={cellCls}>{row.frequency.toFixed(2)}</td>
+      <td className={cellCls}>{fmtNum(row.linkClicks)}</td>
+      {visible.landingPageViews && <td className={cellCls}>{fmtNum(row.landingPageViews)}</td>}
+      {visible.conversions && <td className={cellCls}>{fmtNum(row.conversions)}</td>}
+      {visible.revenue && (
+        <td className={cellCls}>{row.revenue === null ? "—" : fmtMoney(row.revenue)}</td>
+      )}
+      {visible.roasOrCpa && (
+        <td className={cellCls}>
+          {hasRevenue ? fmtRatio(row.roas) : row.cpa === null ? "—" : fmtMoney(row.cpa)}
+        </td>
+      )}
+      {visible.hookRate && (
+        <td className={cellCls}>{row.hookRate === null ? "—" : fmtPct(row.hookRate)}</td>
+      )}
       <td className="py-2 px-3 text-center">
         <FatigueDot level={row.fatigue} />
       </td>
@@ -216,6 +257,11 @@ export function CampaignPerformanceTable({ slug, hasMetaAds, range }: Props) {
     );
   }
 
+  const visible = useMemo<ColumnVisibility>(
+    () => computeVisibility(sortedCampaigns),
+    [sortedCampaigns],
+  );
+
   const headers: { key: SortKey; label: string; align: "left" | "right" | "center" }[] = [
     { key: "name", label: "Name", align: "left" },
     { key: "spend", label: "Spend", align: "right" },
@@ -223,12 +269,14 @@ export function CampaignPerformanceTable({ slug, hasMetaAds, range }: Props) {
     { key: "reach", label: "Reach", align: "right" },
     { key: "frequency", label: "Freq.", align: "right" },
     { key: "linkClicks", label: "Link Clicks", align: "right" },
-    { key: "landingPageViews", label: "LPV", align: "right" },
-    { key: "conversions", label: "Conv.", align: "right" },
-    { key: "revenue", label: "Revenue", align: "right" },
-    { key: "roasOrCpa", label: hasRevenue ? "ROAS" : "CPA", align: "right" },
-    { key: "hookRate", label: "Hook %", align: "right" },
+    ...(visible.landingPageViews ? [{ key: "landingPageViews" as SortKey, label: "LPV", align: "right" as const }] : []),
+    ...(visible.conversions ? [{ key: "conversions" as SortKey, label: "Conv.", align: "right" as const }] : []),
+    ...(visible.revenue ? [{ key: "revenue" as SortKey, label: "Revenue", align: "right" as const }] : []),
+    ...(visible.roasOrCpa ? [{ key: "roasOrCpa" as SortKey, label: hasRevenue ? "ROAS" : "CPA", align: "right" as const }] : []),
+    ...(visible.hookRate ? [{ key: "hookRate" as SortKey, label: "Hook %", align: "right" as const }] : []),
   ];
+  // colspan = chevron(1) + headers + fatigue(1)
+  const totalCols = headers.length + 2;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -322,14 +370,14 @@ export function CampaignPerformanceTable({ slug, hasMetaAds, range }: Props) {
           <tbody>
             {loading && !data && (
               <tr>
-                <td colSpan={13} className="py-8 text-center text-sm text-gray-500">
+                <td colSpan={totalCols} className="py-8 text-center text-sm text-gray-500">
                   Loading campaign data…
                 </td>
               </tr>
             )}
             {!loading && sortedCampaigns.length === 0 && !error && (
               <tr>
-                <td colSpan={13} className="py-8 text-center text-sm text-gray-500">
+                <td colSpan={totalCols} className="py-8 text-center text-sm text-gray-500">
                   No campaigns in this date range.
                 </td>
               </tr>
@@ -343,6 +391,7 @@ export function CampaignPerformanceTable({ slug, hasMetaAds, range }: Props) {
                   open={cOpen}
                   expandedAdSets={expandedAdSets}
                   hasRevenue={hasRevenue}
+                  visible={visible}
                   onToggleCampaign={toggleCampaign}
                   onToggleAdSet={toggleAdSet}
                 />
@@ -355,17 +404,27 @@ export function CampaignPerformanceTable({ slug, hasMetaAds, range }: Props) {
                 <td colSpan={2} className="py-2 px-3 text-xs font-medium text-gray-900 uppercase">
                   Total
                 </td>
-                <td className="py-2 px-3 text-right tabular-nums font-medium text-gray-900">{fmtMoney(data.totals.spend)}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-gray-900">{fmtNum(data.totals.impressions)}</td>
-                <td colSpan={4} />
-                <td className="py-2 px-3 text-right tabular-nums text-gray-900">{fmtNum(data.totals.conversions)}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-gray-900">
-                  {data.totals.revenue === null ? "—" : fmtMoney(data.totals.revenue)}
-                </td>
-                <td className="py-2 px-3 text-right tabular-nums text-gray-900">
-                  {hasRevenue ? fmtRatio(data.totals.roas) : "—"}
-                </td>
-                <td colSpan={2} />
+                <td className="py-2 px-3 text-right tabular-nums font-medium text-gray-900 whitespace-nowrap">{fmtMoney(data.totals.spend)}</td>
+                <td className="py-2 px-3 text-right tabular-nums text-gray-900 whitespace-nowrap">{fmtNum(data.totals.impressions)}</td>
+                <td />
+                <td />
+                <td />
+                {visible.landingPageViews && <td />}
+                {visible.conversions && (
+                  <td className="py-2 px-3 text-right tabular-nums text-gray-900 whitespace-nowrap">{fmtNum(data.totals.conversions)}</td>
+                )}
+                {visible.revenue && (
+                  <td className="py-2 px-3 text-right tabular-nums text-gray-900 whitespace-nowrap">
+                    {data.totals.revenue === null ? "—" : fmtMoney(data.totals.revenue)}
+                  </td>
+                )}
+                {visible.roasOrCpa && (
+                  <td className="py-2 px-3 text-right tabular-nums text-gray-900 whitespace-nowrap">
+                    {hasRevenue ? fmtRatio(data.totals.roas) : "—"}
+                  </td>
+                )}
+                {visible.hookRate && <td />}
+                <td />
               </tr>
             </tfoot>
           )}
@@ -380,6 +439,7 @@ function CampaignRowGroup({
   open,
   expandedAdSets,
   hasRevenue,
+  visible,
   onToggleCampaign,
   onToggleAdSet,
 }: {
@@ -387,6 +447,7 @@ function CampaignRowGroup({
   open: boolean;
   expandedAdSets: Set<string>;
   hasRevenue: boolean;
+  visible: ColumnVisibility;
   onToggleCampaign: (id: string) => void;
   onToggleAdSet: (id: string) => void;
 }) {
@@ -405,7 +466,7 @@ function CampaignRowGroup({
             <StatusPill status={campaign.status} />
           </div>
         </td>
-        <MetricCells row={campaign} hasRevenue={hasRevenue} />
+        <MetricCells row={campaign} hasRevenue={hasRevenue} visible={visible} />
       </tr>
       {open &&
         campaign.adSets.map((s) => {
@@ -416,6 +477,7 @@ function CampaignRowGroup({
               adSet={s}
               open={sOpen}
               hasRevenue={hasRevenue}
+              visible={visible}
               onToggle={onToggleAdSet}
             />
           );
@@ -428,11 +490,13 @@ function AdSetRowGroup({
   adSet,
   open,
   hasRevenue,
+  visible,
   onToggle,
 }: {
   adSet: AdSetRow;
   open: boolean;
   hasRevenue: boolean;
+  visible: ColumnVisibility;
   onToggle: (id: string) => void;
 }) {
   return (
@@ -450,14 +514,14 @@ function AdSetRowGroup({
             <StatusPill status={adSet.status} />
           </div>
         </td>
-        <MetricCells row={adSet} hasRevenue={hasRevenue} />
+        <MetricCells row={adSet} hasRevenue={hasRevenue} visible={visible} />
       </tr>
-      {open && adSet.ads.map((ad) => <AdLeafRow key={ad.id} ad={ad} hasRevenue={hasRevenue} />)}
+      {open && adSet.ads.map((ad) => <AdLeafRow key={ad.id} ad={ad} hasRevenue={hasRevenue} visible={visible} />)}
     </>
   );
 }
 
-function AdLeafRow({ ad, hasRevenue }: { ad: AdRow; hasRevenue: boolean }) {
+function AdLeafRow({ ad, hasRevenue, visible }: { ad: AdRow; hasRevenue: boolean; visible: ColumnVisibility }) {
   return (
     <tr className="border-b border-gray-100">
       <td className="py-2 px-2"></td>
@@ -481,7 +545,7 @@ function AdLeafRow({ ad, hasRevenue }: { ad: AdRow; hasRevenue: boolean }) {
           <StatusPill status={ad.status} />
         </div>
       </td>
-      <MetricCells row={ad} hasRevenue={hasRevenue} />
+      <MetricCells row={ad} hasRevenue={hasRevenue} visible={visible} />
     </tr>
   );
 }
