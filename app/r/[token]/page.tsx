@@ -80,11 +80,25 @@ export default async function PublicReportPage({
     adOptimization?: Array<{ title: string; insight: string; action: string; impact: string }>;
     growthPlays?: Array<{ title: string; insight: string; action: string; impact: string }>;
   } | undefined;
-  const notes = sections.notes as {
-    summary?: string;
-    agencyActions?: Array<{ description: string; owner: string; status: string }>;
-    clientActions?: Array<{ description: string; owner: string; status: string }>;
-  } | undefined;
+  const notes = sections.notes as
+    | {
+        meetingDate?: string;
+        summary?: string;
+        keyDecisions?: string[];
+        meetingNotes?: string | (string | { topic: string; points: string[] })[];
+        dataInsights?: string[];
+        agencyActions?: Array<{ description: string; owner: string; status: string }>;
+        clientActions?: Array<{ description: string; owner: string; status: string }>;
+      }
+    | undefined;
+  const hasStrategyContent =
+    !!notes &&
+    !!(
+      notes.summary ||
+      (notes.keyDecisions && notes.keyDecisions.length > 0) ||
+      notes.meetingNotes ||
+      (notes.dataInsights && notes.dataInsights.length > 0)
+    );
   const reportInsights = sections.reportInsights as unknown as ReportInsights | undefined;
 
   return (
@@ -471,6 +485,74 @@ export default async function PublicReportPage({
                     <div key={i} className="win-row">
                       <span style={{ color: "#4A1942" }}>&starf;</span>
                       <p style={{ fontSize: "0.875rem", color: "#4b5563" }}>{b}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Strategy Notes */}
+          {hasStrategyContent && (
+            <>
+              <hr className="section-divider" />
+              <div className="section-header"><h2 className="serif">Strategy Notes</h2><div className="bar" /></div>
+              {notes?.meetingDate && (
+                <p style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: "1rem" }}>
+                  Meeting date: <span style={{ fontWeight: 500, color: "#374151" }}>{notes.meetingDate}</span>
+                </p>
+              )}
+              {notes?.summary && (
+                <div style={{ marginBottom: "1.5rem", padding: "1.25rem", borderRadius: "0.5rem", background: "#1F2937", color: "#ffffff" }}>
+                  <p style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "rgba(255,255,255,0.6)", fontWeight: 600, marginBottom: "0.5rem" }}>Executive Summary</p>
+                  <p style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "rgba(255,255,255,0.9)", whiteSpace: "pre-wrap" }}>{notes.summary}</p>
+                </div>
+              )}
+              {notes?.keyDecisions && notes.keyDecisions.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <p className="subsection-title agency">Key Decisions</p>
+                  {notes.keyDecisions.map((d, i) => (
+                    <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem", fontSize: "0.875rem", color: "#374151" }}>
+                      <span style={{ color: "#059669", flexShrink: 0 }}>✓</span>
+                      <span>{d}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {notes?.meetingNotes && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <p className="subsection-title agency">Meeting Notes</p>
+                  {Array.isArray(notes.meetingNotes) ? (
+                    <div>
+                      {notes.meetingNotes.map((section, i) => {
+                        if (typeof section === "string") {
+                          return <p key={i} style={{ fontSize: "0.875rem", color: "#374151", lineHeight: 1.6, marginBottom: "0.75rem" }}>{section}</p>;
+                        }
+                        return (
+                          <div key={i} style={{ marginBottom: "1rem" }}>
+                            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#111827", marginBottom: "0.375rem" }}>{section.topic}</p>
+                            {section.points && section.points.length > 0 && (
+                              <ul style={{ paddingLeft: "1rem", listStyle: "disc", margin: 0 }}>
+                                {section.points.map((p, j) => (
+                                  <li key={j} style={{ fontSize: "0.875rem", color: "#374151", lineHeight: 1.6, marginBottom: "0.25rem" }}>{p}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: "0.875rem", color: "#374151", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{notes.meetingNotes}</p>
+                  )}
+                </div>
+              )}
+              {notes?.dataInsights && notes.dataInsights.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <p className="subsection-title agency">Data Insights</p>
+                  {notes.dataInsights.map((d, i) => (
+                    <div key={i} style={{ background: "#eff6ff", borderLeft: "4px solid #93c5fd", padding: "0.5rem 0.75rem", borderRadius: "0 0.25rem 0.25rem 0", fontSize: "0.875rem", color: "#374151", marginBottom: "0.5rem" }}>
+                      📊 {d}
                     </div>
                   ))}
                 </div>

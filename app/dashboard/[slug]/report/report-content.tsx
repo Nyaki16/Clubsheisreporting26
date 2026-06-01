@@ -197,7 +197,25 @@ Club She Is Team`;
   const email = sections.email as { kpis?: { totalSent: number; totalDelivered: number; totalFailed: number; deliveryRate: string; campaignCount: number }; campaigns?: Array<{ name: string; subject: string; date: string; sent: number; delivered: number; failed: number; deliveryRate: string }> } | undefined;
   const insights = sections.insights as { wins?: Array<{ text: string }>; alerts?: Array<{ text: string }> } | undefined;
   const strategy = sections.strategy as { summary?: string; revenueOpportunities?: Array<{ title: string; insight: string; action: string; impact: string }>; adOptimization?: Array<{ title: string; insight: string; action: string; impact: string }>; growthPlays?: Array<{ title: string; insight: string; action: string; impact: string }> } | undefined;
-  const notes = sections.notes as { summary?: string; agencyActions?: Array<{ description: string; owner: string; status: string }>; clientActions?: Array<{ description: string; owner: string; status: string }> } | undefined;
+  const notes = sections.notes as
+    | {
+        meetingDate?: string;
+        summary?: string;
+        keyDecisions?: string[];
+        meetingNotes?: string | (string | { topic: string; points: string[] })[];
+        dataInsights?: string[];
+        agencyActions?: Array<{ description: string; owner: string; status: string; priority?: string; dueDate?: string }>;
+        clientActions?: Array<{ description: string; owner: string; status: string; priority?: string; dueDate?: string }>;
+      }
+    | undefined;
+  const hasStrategyContent =
+    !!notes &&
+    !!(
+      notes.summary ||
+      (notes.keyDecisions && notes.keyDecisions.length > 0) ||
+      notes.meetingNotes ||
+      (notes.dataInsights && notes.dataInsights.length > 0)
+    );
   const performanceTrend = overview.performanceTrend as { labels?: string[]; adSpend?: number[]; newContacts?: number[]; revenue?: number[] } | undefined;
   const socialTrend = (sections.social as { trend?: { labels?: string[]; instagramReach?: number[]; facebookReach?: number[] } } | undefined)?.trend;
 
@@ -576,6 +594,107 @@ Club She Is Team`;
                       <p className="text-sm text-gray-700">{b}</p>
                     </div>
                   ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {hasStrategyContent && (
+            <>
+              <SectionHeader title="Strategy Notes" />
+              {notes?.meetingDate && (
+                <p className="text-xs text-gray-500 mb-4">
+                  Meeting date:{" "}
+                  <span className="font-medium text-gray-700">{notes.meetingDate}</span>
+                </p>
+              )}
+
+              {notes?.summary && (
+                <div className="mb-6 rounded-lg p-5 bg-[#1F2937] text-white">
+                  <p className="text-[0.6rem] uppercase tracking-wider text-white/60 font-semibold mb-2">
+                    Executive Summary
+                  </p>
+                  <p className="text-sm leading-relaxed text-white/90 whitespace-pre-wrap">
+                    {notes.summary}
+                  </p>
+                </div>
+              )}
+
+              {notes?.keyDecisions && notes.keyDecisions.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-[#4A1942] uppercase tracking-wider mb-3">
+                    Key Decisions
+                  </h3>
+                  <ul className="space-y-2">
+                    {notes.keyDecisions.map((d, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-emerald-600 mt-0.5 flex-shrink-0">✓</span>
+                        <span>{d}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {notes?.meetingNotes && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-[#4A1942] uppercase tracking-wider mb-3">
+                    Meeting Notes
+                  </h3>
+                  {Array.isArray(notes.meetingNotes) ? (
+                    <div className="space-y-4">
+                      {notes.meetingNotes.map((section, i) => {
+                        if (typeof section === "string") {
+                          return (
+                            <p key={i} className="text-sm text-gray-700 leading-relaxed">
+                              {section}
+                            </p>
+                          );
+                        }
+                        return (
+                          <div key={i}>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-1.5">
+                              {section.topic}
+                            </h4>
+                            {section.points && section.points.length > 0 && (
+                              <ul className="space-y-1 pl-4">
+                                {section.points.map((p, j) => (
+                                  <li
+                                    key={j}
+                                    className="text-sm text-gray-700 leading-relaxed list-disc"
+                                  >
+                                    {p}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {notes.meetingNotes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {notes?.dataInsights && notes.dataInsights.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-[#4A1942] uppercase tracking-wider mb-3">
+                    Data Insights
+                  </h3>
+                  <div className="space-y-2">
+                    {notes.dataInsights.map((d, i) => (
+                      <div
+                        key={i}
+                        className="bg-blue-50 border-l-4 border-blue-300 px-3 py-2 rounded-r text-sm text-gray-700"
+                      >
+                        📊 {d}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>
