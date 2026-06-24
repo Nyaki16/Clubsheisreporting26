@@ -73,7 +73,7 @@ export async function fetchPaystackTransactions(
       const result = await paystackFetch<PaystackListResponse<PaystackTransaction>>(
         "/transaction",
         key,
-        { from, to, perPage: "200", page: String(page) }
+        { from, to, perPage: "100", page: String(page) }
       );
 
       for (const txn of result.data) {
@@ -101,7 +101,10 @@ export async function fetchPaystackTransactions(
         }
       }
 
-      hasMore = result.data.length >= 200;
+      // Paystack caps perPage at 100, so page by pageCount, not a fixed size
+      // (the old `length >= 200` check stopped after one page and dropped data).
+      const pageCount = result.meta?.pageCount ?? 1;
+      hasMore = page < pageCount && result.data.length > 0;
       page++;
     }
   }
@@ -153,7 +156,7 @@ export async function fetchPaystackSubscriptions(
         const result = await paystackFetch<PaystackListResponse<PaystackSubscription>>(
           "/subscription",
           key,
-          { status, perPage: "200", page: String(page) }
+          { status, perPage: "100", page: String(page) }
         );
 
         for (const sub of result.data) {
@@ -169,7 +172,9 @@ export async function fetchPaystackSubscriptions(
           if (status === "non-renewing") nonRenewing++;
         }
 
-        hasMore = result.data.length >= 200;
+        // Paystack caps perPage at 100 — page by pageCount, not a fixed size.
+        const pageCount = result.meta?.pageCount ?? 1;
+        hasMore = page < pageCount && result.data.length > 0;
         page++;
       }
     }
