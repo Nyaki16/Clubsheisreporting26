@@ -1,24 +1,228 @@
 {
-  "clientId": "33d1c611-d00f-4f32-b3ad-2a4e94a9437c",
-  "adAccountId": "612232814892038",
-  "dateRange": { "start": "2026-05-02", "end": "2026-05-31" },
-  "revenueSource": "none",
-  "conversionField": "actions:omni_purchase",
-  "campaigns": [
-    { "id": "120239042942850009", "name": "How to scale your NGO Webinar - May 2026", "effective_status": "ACTIVE" }
-  ],
-  "adsets": [
-    { "id": "120239042942830009", "name": "How to scale your NGO Webinar Ads - May 2026", "campaign_id": "120239042942850009", "effective_status": "ACTIVE" }
-  ],
-  "ads": [
-    { "id": "120242607847560009", "name": "How to scale your NGO- Beyond the CIPC", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR436.38", "impressions": "9,559", "reach": "5,996", "frequency": "1.59", "3_second_video_plays": "69", "actions:link_click": "307", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120239299781920009", "name": "How to scale your NGO - Orange Dress", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR56.44", "impressions": "1,058", "reach": "971", "frequency": "1.09", "3_second_video_plays": "406", "actions:link_click": "62", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120242608000520009", "name": "How to scale your NGO- Newspaper article", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR51.57", "impressions": "898", "reach": "734", "frequency": "1.22", "3_second_video_plays": "1", "actions:link_click": "23", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120239042942840009", "name": "How to scale your NGO Webinar - Green Suit", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR16.97", "impressions": "385", "reach": "353", "frequency": "1.09", "3_second_video_plays": "187", "actions:link_click": "16", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120242607775040009", "name": "How to scale your NGO- Before & After Static", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR10.17", "impressions": "173", "reach": "147", "frequency": "1.18", "3_second_video_plays": "Not available", "actions:link_click": "6", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120239299721410009", "name": "How to scale your NGO- Picture with Bill Gates", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR9.58", "impressions": "199", "reach": "167", "frequency": "1.19", "3_second_video_plays": "36", "actions:link_click": "4", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120241458465010009", "name": "How to scale your NGO - Feedback Statics", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR6.61", "impressions": "122", "reach": "98", "frequency": "1.24", "3_second_video_plays": "Not available", "actions:link_click": "3", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120242607671850009", "name": "How to scale your NGO- Text messages – Copy", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR6.50", "impressions": "179", "reach": "141", "frequency": "1.27", "3_second_video_plays": "1", "actions:link_click": "12", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" },
-    { "id": "120242607917100009", "name": "How to scale your NGO- Sibu VS Them", "campaign_id": "120239042942850009", "adset_id": "120239042942830009", "effective_status": "ACTIVE", "amount_spent": "ZAR6.14", "impressions": "119", "reach": "103", "frequency": "1.16", "3_second_video_plays": "Not available", "actions:link_click": "4", "actions:omni_purchase": "Not available", "purchase_roas": "Not available" }
-  ]
+ "clientId": "33d1c611-d00f-4f32-b3ad-2a4e94a9437c",
+ "adAccountId": "612232814892038",
+ "dateRange": {
+  "start": "2026-06-01",
+  "end": "2026-06-24"
+ },
+ "revenueSource": "none",
+ "conversionField": "actions:omni_purchase",
+ "campaigns": [
+  {
+   "id": "120239042942850009",
+   "name": "How to scale your NGO Webinar - May 2026",
+   "effective_status": "ACTIVE"
+  },
+  {
+   "id": "120228301454300009",
+   "name": "JHB Event",
+   "effective_status": "PAUSED"
+  },
+  {
+   "id": "120226707955250009",
+   "name": "Purpose for Impact Live Event KZN",
+   "effective_status": "PAUSED"
+  },
+  {
+   "id": "120225893672800009",
+   "name": "Purpose for Impact Live Event Cape Town",
+   "effective_status": "PAUSED"
+  },
+  {
+   "id": "120222462437820009",
+   "name": "Webinar 28 May Campaign",
+   "effective_status": "PAUSED"
+  },
+  {
+   "id": "120222445616280009",
+   "name": "New Traffic Campaign with recommended settings",
+   "effective_status": "PAUSED"
+  },
+  {
+   "id": "120230059579000009",
+   "name": "Durban Masterclass",
+   "effective_status": "ACTIVE"
+  }
+ ],
+ "adsets": [
+  {
+   "id": "120239042942830009",
+   "name": "How to scale your NGO Webinar Ads - May 2026",
+   "campaign_id": "120239042942850009",
+   "effective_status": "ACTIVE"
+  },
+  {
+   "id": "120228301454310009",
+   "name": "New Sales ad set",
+   "campaign_id": "120228301454300009",
+   "effective_status": "CAMPAIGN_PAUSED"
+  },
+  {
+   "id": "120226707955240009",
+   "name": "Durban",
+   "campaign_id": "120226707955250009",
+   "effective_status": "CAMPAIGN_PAUSED"
+  },
+  {
+   "id": "120225893672790009",
+   "name": "Cape Town",
+   "campaign_id": "120225893672800009",
+   "effective_status": "CAMPAIGN_PAUSED"
+  },
+  {
+   "id": "120222462437810009",
+   "name": "Webinar 28 May Ad Set",
+   "campaign_id": "120222462437820009",
+   "effective_status": "CAMPAIGN_PAUSED"
+  },
+  {
+   "id": "120222445616290009",
+   "name": "Traffic NGO Audience",
+   "campaign_id": "120222445616280009",
+   "effective_status": "CAMPAIGN_PAUSED"
+  },
+  {
+   "id": "120230059579010009",
+   "name": "New Sales ad set",
+   "campaign_id": "120230059579000009",
+   "effective_status": "ACTIVE"
+  }
+ ],
+ "ads": [
+  {
+   "id": "120242607847560009",
+   "name": "How to scale your NGO- Beyond the CIPC",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR509.64",
+   "impressions": "16,657",
+   "reach": "10,367",
+   "frequency": "1.61",
+   "actions:link_click": "435",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120242607671850009",
+   "name": "How to scale your NGO- Text messages – Copy",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR23.27",
+   "impressions": "736",
+   "reach": "690",
+   "frequency": "1.07",
+   "actions:link_click": "14",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120242607917100009",
+   "name": "How to scale your NGO- Sibu VS Them",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR17.35",
+   "impressions": "663",
+   "reach": "433",
+   "frequency": "1.53",
+   "actions:link_click": "46",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120241458465010009",
+   "name": "How to scale your NGO - Feedback Statics",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR16.77",
+   "impressions": "646",
+   "reach": "517",
+   "frequency": "1.25",
+   "actions:link_click": "27",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120242608000520009",
+   "name": "How to scale your NGO- Newspaper article",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR10.03",
+   "impressions": "346",
+   "reach": "276",
+   "frequency": "1.25",
+   "actions:link_click": "7",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120239299781920009",
+   "name": "How to scale your NGO - Orange Dress",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR140.06",
+   "impressions": "4,246",
+   "reach": "3,628",
+   "frequency": "1.17",
+   "actions:link_click": "167",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120239042942840009",
+   "name": "How to scale your NGO Webinar - Green Suit",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR30.36",
+   "impressions": "837",
+   "reach": "789",
+   "frequency": "1.06",
+   "actions:link_click": "35",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120242607775040009",
+   "name": "How to scale your NGO- Before & After Static",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR3.53",
+   "impressions": "81",
+   "reach": "69",
+   "frequency": "1.17",
+   "actions:link_click": "2",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  },
+  {
+   "id": "120239299721410009",
+   "name": "How to scale your NGO- Picture with Bill Gates",
+   "campaign_id": "120239042942850009",
+   "adset_id": "120239042942830009",
+   "effective_status": "ACTIVE",
+   "amount_spent": "ZAR15.64",
+   "impressions": "384",
+   "reach": "307",
+   "frequency": "1.25",
+   "actions:link_click": "5",
+   "actions:omni_purchase": "Not available",
+   "purchase_roas": "Not available",
+   "3_second_video_plays": "Not available"
+  }
+ ]
 }
