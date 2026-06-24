@@ -83,3 +83,11 @@ export function getClientBySlug(slug: string): ClientAccountMapping | undefined 
 export function getClientByUuid(uuid: string): ClientAccountMapping | undefined {
   return CLIENT_ACCOUNTS.find((c) => c.uuid === uuid);
 }
+
+// Map a GoHighLevel location (sub-account) ID to its client. Used by the GHL
+// embed route so the dashboard auto-scopes to whichever sub-account it's
+// loaded inside. Case-insensitive to be forgiving of merge-field formatting.
+export function getClientByLocationId(locationId: string): ClientAccountMapping | undefined {
+  const id = locationId.trim().toLowerCase();
+  return CLIENT_ACCOUNTS.find((c) => c.goHighLevel?.toLowerCase() === id);
+}
