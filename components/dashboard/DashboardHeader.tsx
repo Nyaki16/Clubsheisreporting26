@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Calendar, RefreshCw, FileText, CalendarPlus, X } from "lucide-react";
 import Link from "next/link";
 import { KeyDates } from "./KeyDates";
+
+const CUSTOM_VALUE = "__custom__";
 
 interface Props {
   clientName: string;
@@ -38,6 +41,28 @@ export function DashboardHeader({
 
   // Admin signal: dashboard-shell only passes clients[] when admin.
   const isAdmin = clients.length > 0;
+
+  // Custom date range (drives every tab via ?start=&end= in the URL).
+  const pathname = usePathname();
+  const router = useRouter();
+  const sp = useSearchParams();
+  const activeStart = sp.get("start") || "";
+  const activeEnd = sp.get("end") || "";
+  const customActive = Boolean(activeStart && activeEnd);
+  const [showCustom, setShowCustom] = useState(customActive);
+  const [rangeStart, setRangeStart] = useState(activeStart);
+  const [rangeEnd, setRangeEnd] = useState(activeEnd);
+
+  function applyCustomRange() {
+    if (!rangeStart || !rangeEnd) return;
+    const s = rangeStart <= rangeEnd ? rangeStart : rangeEnd;
+    const e = rangeStart <= rangeEnd ? rangeEnd : rangeStart;
+    router.push(`${pathname}?start=${s}&end=${e}`);
+  }
+  function clearCustomRange() {
+    setShowCustom(false);
+    router.push(pathname);
+  }
 
   async function handleSync() {
     setSyncing(true);
@@ -133,16 +158,54 @@ export function DashboardHeader({
               <span>REPORTING PERIOD:</span>
               <select
                 className="bg-transparent border-none text-white font-semibold text-sm focus:outline-none cursor-pointer"
-                value={currentPeriodId}
-                onChange={(e) => onPeriodChange(e.target.value)}
+                value={customActive ? CUSTOM_VALUE : currentPeriodId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === CUSTOM_VALUE) {
+                    setShowCustom(true);
+                  } else {
+                    setShowCustom(false);
+                    onPeriodChange(v);
+                  }
+                }}
               >
                 {periods.map((p) => (
                   <option key={p.id} value={p.id} className="text-gray-900">
                     {p.label}
                   </option>
                 ))}
+                <option value={CUSTOM_VALUE} className="text-gray-900">Custom range…</option>
               </select>
             </div>
+            {showCustom && (
+              <div className="mt-2 inline-flex flex-wrap items-center justify-end gap-2 bg-white/15 rounded-lg px-3 py-2 text-sm backdrop-blur-sm">
+                <input
+                  type="date"
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(e.target.value)}
+                  className="bg-white/90 text-gray-900 rounded px-2 py-1 text-xs focus:outline-none"
+                />
+                <span className="text-white/80 text-xs">→</span>
+                <input
+                  type="date"
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(e.target.value)}
+                  className="bg-white/90 text-gray-900 rounded px-2 py-1 text-xs focus:outline-none"
+                />
+                <button
+                  onClick={applyCustomRange}
+                  disabled={!rangeStart || !rangeEnd}
+                  className="rounded bg-white text-[#4A1942] px-3 py-1 text-xs font-semibold hover:bg-white/90 transition-colors disabled:opacity-50"
+                >
+                  Apply
+                </button>
+                {customActive && (
+                  <button onClick={clearCustomRange} className="text-white/80 hover:text-white text-xs underline">
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-3 mt-2">
               <button
                 onClick={handleSync}

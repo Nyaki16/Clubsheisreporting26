@@ -20,6 +20,8 @@ export function CRMContent({ slug }: { slug: string }) {
   const { data: sections, loading } = useDashboardSections(slug, ["ghl", "systeme"]);
   const searchParams = useSearchParams();
   const period = searchParams.get("period") || "";
+  const start = searchParams.get("start") || "";
+  const end = searchParams.get("end") || "";
 
   // Live GHL overlay — fetch the latest numbers straight from Ghutte on load and
   // overlay them on the stored data. Falls back silently to stored data on error.
@@ -29,7 +31,12 @@ export function CRMContent({ slug }: { slug: string }) {
   useEffect(() => {
     let cancelled = false;
     const qs = new URLSearchParams({ slug });
-    if (period) qs.set("period", period);
+    if (start && end) {
+      qs.set("start", start);
+      qs.set("end", end);
+    } else if (period) {
+      qs.set("period", period);
+    }
     fetch(`/api/ghl/live?${qs.toString()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
@@ -42,7 +49,7 @@ export function CRMContent({ slug }: { slug: string }) {
     return () => {
       cancelled = true;
     };
-  }, [slug, period]);
+  }, [slug, period, start, end]);
 
   const storedGhl = (sections.ghl as GHLData | undefined) || null;
   const ghlData = liveGhl || storedGhl;

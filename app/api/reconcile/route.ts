@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const slug = request.nextUrl.searchParams.get("slug");
     const periodParam = request.nextUrl.searchParams.get("period");
+    const startParam = request.nextUrl.searchParams.get("start");
+    const endParam = request.nextUrl.searchParams.get("end");
     if (!slug) return Response.json({ error: "Missing slug" }, { status: 400 });
 
     const isAdmin = request.cookies.get("admin_session")?.value === "true";
@@ -57,33 +59,46 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve period date range.
-    let pq = supabase.from("reporting_periods").select("id, start_date, end_date");
-    if (periodParam) {
-      const isUuid = /^[0-9a-f]{8}-/.test(periodParam);
-      pq = isUuid ? pq.eq("id", periodParam) : pq.eq("period_key", periodParam);
+    let rangeStart: string;
+    let rangeEnd: string;
+    let periodId: string | null = null;
+    if (startParam && endParam) {
+      rangeStart = startParam;
+      rangeEnd = endParam;
     } else {
-      pq = pq.eq("is_current", true);
+      let pq = supabase.from("reporting_periods").select("id, start_date, end_date");
+      if (periodParam) {
+        const isUuid = /^[0-9a-f]{8}-/.test(periodParam);
+        pq = isUuid ? pq.eq("id", periodParam) : pq.eq("period_key", periodParam);
+      } else {
+        pq = pq.eq("is_current", true);
+      }
+      const { data: period } = await pq.maybeSingle();
+      if (!period) return Response.json({ error: "Period not found" }, { status: 404 });
+      rangeStart = period.start_date;
+      rangeEnd = period.end_date;
+      periodId = period.id;
     }
-    const { data: period } = await pq.maybeSingle();
-    if (!period) return Response.json({ error: "Period not found" }, { status: 404 });
 
     const data = await buildReconciliation(paystackKey, pitKey, locationId, {
-      start: period.start_date,
-      end: period.end_date,
+      start: rangeStart,
+      end: rangeEnd,
     });
 
-    // Cache to dashboard_data so the report/PDF can read it without a live call.
-    const { data: existing } = await supabase
-      .from("dashboard_data")
-      .select("id")
-      .eq("client_id", client.id)
-      .eq("period_id", period.id)
-      .eq("section", "reconciliation")
-      .maybeSingle();
-    if (existing) {
-      await supabase.from("dashboard_data").update({ data, updated_at: new Date().toISOString() }).eq("id", existing.id);
-    } else {
-      await supabase.from("dashboard_data").insert({ client_id: client.id, period_id: period.id, section: "reconciliation", data });
+    // Cache to dashboard_data for monthly periods (custom ranges aren't cached).
+    if (periodId) {
+      const { data: existing } = await supabase
+        .from("dashboard_data")
+        .select("id")
+        .eq("client_id", client.id)
+        .eq("period_id", periodId)
+        .eq("section", "reconciliation")
+        .maybeSingle();
+      if (existing) {
+        await supabase.from("dashboard_data").update({ data, updated_at: new Date().toISOString() }).eq("id", existing.id);
+      } else {
+        await supabase.from("dashboard_data").insert({ client_id: client.id, period_id: periodId, section: "reconciliation", data });
+      }
     }
 
     return Response.json({ success: true, data });

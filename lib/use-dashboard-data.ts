@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 export function useDashboardData<T>(slug: string, section: string) {
   const searchParams = useSearchParams();
   const periodParam = searchParams.get("period");
+  const startParam = searchParams.get("start");
+  const endParam = searchParams.get("end");
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -14,6 +16,20 @@ export function useDashboardData<T>(slug: string, section: string) {
     async function load() {
       setLoading(true);
       setData(null);
+
+      // Custom date range — compute live (cached server-side) via /api/range.
+      if (startParam && endParam) {
+        try {
+          const res = await fetch(`/api/range?slug=${encodeURIComponent(slug)}&start=${startParam}&end=${endParam}`);
+          const json = await res.json();
+          const all = (json?.success && json.data ? json.data : {}) as Record<string, unknown>;
+          setData((all[section] as T) ?? null);
+        } catch {
+          setData(null);
+        }
+        setLoading(false);
+        return;
+      }
 
       const { data: client } = await supabase
         .from("clients").select("id").eq("slug", slug).single();
@@ -51,7 +67,7 @@ export function useDashboardData<T>(slug: string, section: string) {
       setLoading(false);
     }
     load();
-  }, [slug, section, periodParam]);
+  }, [slug, section, periodParam, startParam, endParam]);
 
   return { data, loading };
 }
@@ -60,6 +76,8 @@ export function useDashboardData<T>(slug: string, section: string) {
 export function useDashboardSections(slug: string, sections: string[]) {
   const searchParams = useSearchParams();
   const periodParam = searchParams.get("period");
+  const startParam = searchParams.get("start");
+  const endParam = searchParams.get("end");
   const [data, setData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +85,23 @@ export function useDashboardSections(slug: string, sections: string[]) {
     async function load() {
       setLoading(true);
       setData({});
+
+      // Custom date range — compute sections live (cached server-side) instead
+      // of reading a monthly period.
+      if (startParam && endParam) {
+        try {
+          const res = await fetch(`/api/range?slug=${encodeURIComponent(slug)}&start=${startParam}&end=${endParam}`);
+          const json = await res.json();
+          const all = (json?.success && json.data ? json.data : {}) as Record<string, unknown>;
+          const result: Record<string, unknown> = {};
+          for (const s of sections) if (all[s] !== undefined) result[s] = all[s];
+          setData(result);
+        } catch {
+          setData({});
+        }
+        setLoading(false);
+        return;
+      }
 
       const { data: client } = await supabase
         .from("clients").select("id").eq("slug", slug).single();
@@ -105,7 +140,7 @@ export function useDashboardSections(slug: string, sections: string[]) {
       setLoading(false);
     }
     load();
-  }, [slug, sections.join(","), periodParam]);
+  }, [slug, sections.join(","), periodParam, startParam, endParam]);
 
   return { data, loading };
 }

@@ -26,6 +26,8 @@ const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleDateString("en-ZA"
 export function ReconciliationSection({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const period = searchParams.get("period") || "";
+  const start = searchParams.get("start") || "";
+  const end = searchParams.get("end") || "";
   const [data, setData] = useState<ReconciliationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
@@ -33,7 +35,12 @@ export function ReconciliationSection({ slug }: { slug: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     const qs = new URLSearchParams({ slug });
-    if (period) qs.set("period", period);
+    if (start && end) {
+      qs.set("start", start);
+      qs.set("end", end);
+    } else if (period) {
+      qs.set("period", period);
+    }
     try {
       const res = await fetch(`/api/reconcile?${qs.toString()}`);
       const json = await res.json();
@@ -48,7 +55,7 @@ export function ReconciliationSection({ slug }: { slug: string }) {
       setUnavailable(true);
     }
     setLoading(false);
-  }, [slug, period]);
+  }, [slug, period, start, end]);
 
   useEffect(() => {
     load();

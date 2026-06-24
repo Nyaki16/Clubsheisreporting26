@@ -29,13 +29,13 @@ const MONTH_LABELS = [
 ];
 
 // Membership plan amounts that count as "members" per client
-const MEMBERSHIP_AMOUNTS: Record<string, number[]> = {
+export const MEMBERSHIP_AMOUNTS: Record<string, number[]> = {
   "0a9476d1-5a5a-4f4b-b213-8c9528587b37": [149, 349],  // CSI
   "eb1d354f-d57f-4730-9cfb-6f057b83ee08": [149],         // W&W
 };
 
 // Clients where GHL revenue represents new subscribers
-const GHL_NEW_SUBS_CLIENTS = ["eb1d354f-d57f-4730-9cfb-6f057b83ee08"]; // W&W
+export const GHL_NEW_SUBS_CLIENTS = ["eb1d354f-d57f-4730-9cfb-6f057b83ee08"]; // W&W
 
 // Periods with verified data from full-sync.mjs — auto-sync must NOT overwrite these
 const LOCKED_PERIODS = [
@@ -235,7 +235,7 @@ export async function runMonthlySync(
   return results;
 }
 
-async function fetchPaystackData(clientId: string, from: string, to: string) {
+export async function fetchPaystackData(clientId: string, from: string, to: string) {
   const keys = await getPaystackKeys(clientId);
   if (!keys.length) return null;
 
