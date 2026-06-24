@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useDashboardSections } from "@/lib/use-dashboard-data";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { KPICardTinted } from "@/components/dashboard/KPICardTinted";
@@ -15,7 +17,34 @@ import type { GHLData, SystemeData } from "@/types/dashboard";
 
 export function CRMContent({ slug }: { slug: string }) {
   const { data: sections, loading } = useDashboardSections(slug, ["ghl", "systeme"]);
-  const ghlData = sections.ghl as GHLData | undefined || null;
+  const searchParams = useSearchParams();
+  const period = searchParams.get("period") || "";
+
+  // Live GHL overlay — fetch the latest numbers straight from Ghutte on load and
+  // overlay them on the stored data. Falls back silently to stored data on error.
+  const [liveGhl, setLiveGhl] = useState<GHLData | null>(null);
+  const [liveAt, setLiveAt] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const qs = new URLSearchParams({ slug });
+    if (period) qs.set("period", period);
+    fetch(`/api/ghl/live?${qs.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (!cancelled && res?.success && res.data) {
+          setLiveGhl(res.data as GHLData);
+          setLiveAt(res.fetchedAt || "");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, period]);
+
+  const storedGhl = (sections.ghl as GHLData | undefined) || null;
+  const ghlData = liveGhl || storedGhl;
   const systemeData = sections.systeme as SystemeData | undefined || null;
 
   if (loading) return <LoadingSkeleton />;
@@ -27,7 +56,15 @@ export function CRMContent({ slug }: { slug: string }) {
       {ghlData && (
         <>
           <div>
-            <h2 className="font-serif text-xl font-semibold text-gray-900">CRM — Ghutte</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif text-xl font-semibold text-gray-900">CRM — Ghutte</h2>
+              {liveGhl && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Live{liveAt ? ` · ${new Date(liveAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500 mb-4">New contacts, revenue, opportunities, and pipeline from Ghutte.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {ghlData.kpis.slice(0, 5).map((kpi) => (
