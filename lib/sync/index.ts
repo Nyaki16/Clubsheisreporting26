@@ -44,7 +44,22 @@ const LOCKED_PERIODS = [
   "march-2026",
 ];
 
-export async function runMonthlySync(year: number, month: number): Promise<SyncResult[]> {
+interface SyncOptions {
+  // Sync only this client (by slug). Used by the per-client "Refresh" button so
+  // a current-month refresh stays well under the serverless timeout.
+  onlySlug?: string;
+  // Whether to mark this period as the global current one. Defaults to true for
+  // the full monthly run; the per-client refresh passes false so refreshing one
+  // client's current month doesn't blank the other clients' default view.
+  makeCurrent?: boolean;
+}
+
+export async function runMonthlySync(
+  year: number,
+  month: number,
+  opts: SyncOptions = {},
+): Promise<SyncResult[]> {
+  const { onlySlug, makeCurrent = true } = opts;
   const supabase = getServiceClient();
   const results: SyncResult[] = [];
 
@@ -62,11 +77,13 @@ export async function runMonthlySync(year: number, month: number): Promise<SyncR
     .single();
 
   if (!period) {
-    // Set all other periods to not current
-    await supabase.from("reporting_periods").update({ is_current: false }).neq("id", "00000000-0000-0000-0000-000000000000");
+    if (makeCurrent) {
+      // Set all other periods to not current
+      await supabase.from("reporting_periods").update({ is_current: false }).neq("id", "00000000-0000-0000-0000-000000000000");
+    }
     const { data: newPeriod } = await supabase
       .from("reporting_periods")
-      .insert({ period_key: periodKey, label: periodLabel, start_date: startDate, end_date: endDate, is_current: true })
+      .insert({ period_key: periodKey, label: periodLabel, start_date: startDate, end_date: endDate, is_current: makeCurrent })
       .select()
       .single();
     period = newPeriod;
@@ -102,6 +119,7 @@ export async function runMonthlySync(year: number, month: number): Promise<SyncR
 
   // 4. For each client, fetch data and build sections
   for (const client of CLIENT_ACCOUNTS) {
+    if (onlySlug && client.slug !== onlySlug) continue;
     const result: SyncResult = { client: client.name, sections: [], errors: [] };
 
     try {

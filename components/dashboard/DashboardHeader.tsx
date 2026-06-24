@@ -43,30 +43,32 @@ export function DashboardHeader({
     setSyncing(true);
     setSyncResult(null);
     try {
-      // Parse month/year from the selected period label (e.g. "April 2026")
+      // Refresh THIS client's current (in-progress) month. Works for admins and
+      // for the client session inside the GHL embed; the API scopes a client
+      // session to its own current month automatically.
       const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-      const selected = periods.find(p => p.id === currentPeriodId);
-      const parts = selected?.label?.split(" ") || [];
-      const monthIdx = months.indexOf(parts[0]) + 1;
-      const year = parseInt(parts[1]) || new Date().getFullYear();
-      const month = monthIdx || new Date().getMonth() + 1;
-
       const res = await fetch("/api/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer 1234" },
-        body: JSON.stringify({ year, month }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, current: true }),
       });
       const data = await res.json();
       if (data.success) {
         const totalSections = data.results?.reduce((s: number, r: { sections: string[] }) => s + r.sections.length, 0) || 0;
-        setSyncResult(`Synced ${totalSections} sections`);
-        // Reload page after brief delay to show fresh data
-        setTimeout(() => window.location.reload(), 1500);
+        setSyncResult(`Refreshed ${totalSections} sections`);
+        // Land on the month we just refreshed so the fresh data is visible.
+        const { year, month } = data.period || {};
+        const periodKey = year && month ? `${months[month - 1].toLowerCase()}-${year}` : "";
+        setTimeout(() => {
+          window.location.href = periodKey
+            ? `/dashboard/${slug}?period=${periodKey}`
+            : window.location.href;
+        }, 1200);
       } else {
-        setSyncResult("Sync failed");
+        setSyncResult(data.error ? "Refresh failed" : "Refresh failed");
       }
     } catch {
-      setSyncResult("Sync error");
+      setSyncResult("Refresh error");
     }
     setSyncing(false);
   }
@@ -146,10 +148,10 @@ export function DashboardHeader({
                 onClick={handleSync}
                 disabled={syncing}
                 className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-3 py-1.5 text-xs backdrop-blur-sm hover:bg-white/25 transition-colors disabled:opacity-50"
-                title="Sync latest data from Paystack & APIs"
+                title="Pull this client's latest data for the current month"
               >
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
-                {syncing ? "Syncing..." : syncResult || "Sync Data"}
+                {syncing ? "Refreshing..." : syncResult || "Refresh Data"}
               </button>
               {isAdmin && (
                 <div className="relative">

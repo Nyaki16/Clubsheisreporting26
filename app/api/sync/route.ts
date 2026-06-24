@@ -34,27 +34,52 @@ export async function GET(request: NextRequest) {
 // POST handler for manual trigger from admin UI
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin auth
-    const authHeader = request.headers.get("authorization");
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (adminPassword && authHeader !== `Bearer ${adminPassword}`) {
-      const adminCookie = request.cookies.get("admin_session");
-      if (adminCookie?.value !== "true") {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    }
-
     const body = await request.json().catch(() => ({}));
     const now = new Date();
-    const year = body.year || now.getFullYear();
-    const month = body.month || (now.getMonth() === 0 ? 12 : now.getMonth());
 
-    const results = await runMonthlySync(year, month);
+    // --- Auth ---
+    // Admins (Bearer password or admin_session) can sync anything. A client
+    // session may refresh ONLY its own current month (the embed runs as a
+    // client), so we ignore any month/slug it sends and force a safe scope.
+    const authHeader = request.headers.get("authorization");
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const isAdmin =
+      (!!adminPassword && authHeader === `Bearer ${adminPassword}`) ||
+      request.cookies.get("admin_session")?.value === "true";
+
+    let onlySlug: string | undefined = body.slug;
+    let useCurrent = !!body.current;
+    let makeCurrent = body.slug ? false : body.makeCurrent !== false;
+
+    if (!isAdmin) {
+      let sessionSlug: string | null = null;
+      try {
+        const c = request.cookies.get("client_session")?.value;
+        sessionSlug = c ? JSON.parse(c).slug : null;
+      } catch {
+        sessionSlug = null;
+      }
+      if (!sessionSlug || (body.slug && body.slug !== sessionSlug)) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      // Force safe scope for client-triggered refreshes.
+      onlySlug = sessionSlug;
+      useCurrent = true;
+      makeCurrent = false;
+    }
+
+    // `current: true` targets the in-progress calendar month (month-to-date).
+    // Otherwise default to the previous completed month (the monthly model).
+    const currentMonth = now.getMonth() + 1; // 1-indexed
+    const year = (!isAdmin ? undefined : body.year) || now.getFullYear();
+    const month = (!isAdmin ? undefined : body.month) || (useCurrent ? currentMonth : (now.getMonth() === 0 ? 12 : now.getMonth()));
+
+    const results = await runMonthlySync(year, month, { onlySlug, makeCurrent });
 
     return Response.json({
       success: true,
       period: { year, month },
+      slug: body.slug || "all",
       results,
     });
   } catch (e) {
