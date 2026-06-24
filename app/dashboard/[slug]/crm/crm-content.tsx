@@ -11,6 +11,7 @@ import { ContactSourceTable } from "@/components/dashboard/ContactSourceTable";
 import { ProductSalesChart } from "@/components/dashboard/ProductSalesChart";
 import { TopTagsChart } from "@/components/dashboard/TopTagsChart";
 import { TrafficSourcesTable } from "@/components/dashboard/TrafficSourcesTable";
+import { ReconciliationSection } from "@/components/dashboard/ReconciliationSection";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { GHLData, SystemeData } from "@/types/dashboard";
@@ -129,6 +130,9 @@ export function CRMContent({ slug }: { slug: string }) {
           )}
         </>
       )}
+
+      {/* Paystack ↔ Ghutte payment reconciliation (auto-hides if not applicable) */}
+      <ReconciliationSection slug={slug} />
     </div>
   );
 }
