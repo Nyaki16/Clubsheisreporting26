@@ -192,6 +192,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
     const clients = new Set(succ.map((t) => t.key)).size;
     const pending = all.filter((t) => t.status === "pending");
     const failed = all.filter((t) => t.status === "failed");
+    const refunded = all.filter((t) => t.status === "refunded");
     return {
       rev,
       payments: succ.length,
@@ -200,6 +201,8 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       pendingV: pending.reduce((a, t) => a + t.amount, 0),
       failedN: failed.length,
       failedV: failed.reduce((a, t) => a + t.amount, 0),
+      refundedN: refunded.length,
+      refundedV: refunded.reduce((a, t) => a + t.amount, 0),
     };
   }, [all]);
 
@@ -247,11 +250,12 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       <p className="text-sm text-gray-500 mb-4">Grouped by product, with sorting, filters and client drill-down.</p>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Kpi label="Successful revenue" value={zar(kpis.rev)} sub={`${kpis.payments} payments`} tone="good" />
         <Kpi label="Paying clients" value={String(kpis.clients)} sub="unique" />
         <Kpi label="Pending" value={String(kpis.pendingN)} sub={zar(kpis.pendingV)} tone="warn" />
         <Kpi label="Failed" value={String(kpis.failedN)} sub={zar(kpis.failedV)} tone="bad" />
+        <Kpi label="Refunded" value={zar(kpis.refundedV)} sub={`${kpis.refundedN} refunds`} tone="bad" />
       </div>
 
       {/* Controls */}
@@ -303,7 +307,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
         {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} cohorts={cohorts} juniorInfo={juniorInfo} slug={slug} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })} />}
-        {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} onClient={setModalKey} />}
+        {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} juniorInfo={juniorInfo} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
 
@@ -786,7 +790,7 @@ function NoteCell({ slug, clientKey, name, note, onChanged }: { slug: string; cl
 
 // Groups clients by program + intake month (from cohort assignments), showing
 // collected vs outstanding per cohort with an expandable roster.
-function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, ClientBalance>; cohorts: Record<string, { cohort: string }>; onClient: (k: string) => void }) {
+function ByCohort({ balances, cohorts, juniorInfo, onClient }: { balances: Record<string, ClientBalance>; cohorts: Record<string, { cohort: string }>; juniorInfo: Record<string, { kidName: string; level: string }>; onClient: (k: string) => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   type Member = { key: string; name: string; paid: number; outstanding: number };
   type Group = { id: string; product: string; cohort: string; members: Member[]; paid: number; outstanding: number };
@@ -838,7 +842,10 @@ function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, Cl
             </tr>
             {expanded === g.id && [...g.members].sort((a, b) => b.outstanding - a.outstanding).map((m) => (
               <tr key={g.id + m.key} className="border-b border-gray-50 bg-gray-50/40">
-                <td className="px-8 py-2"><span className="text-[#4A1942] cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); onClient(m.key); }}>{m.name}</span></td>
+                <td className="px-8 py-2">
+                  <span className="text-[#4A1942] cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); onClient(m.key); }}>{m.name}</span>
+                  <NameBadges vip={(balances[m.key]?.programs || []).some((p) => p.tier === "VIP")} level={juniorInfo[m.key]?.level} />
+                </td>
                 <td />
                 <td className="px-4 py-2 text-right text-gray-600">{zar2(m.paid)}</td>
                 <td className="px-4 py-2 text-right" style={{ color: m.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{m.outstanding > 0 ? zar2(m.outstanding) : "—"}</td>
