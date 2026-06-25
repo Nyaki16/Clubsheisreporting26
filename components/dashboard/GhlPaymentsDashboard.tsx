@@ -68,6 +68,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const [txns, setTxns] = useState<Txn[] | null>(null);
   const [balances, setBalances] = useState<Record<string, ClientBalance>>({});
   const [cohorts, setCohorts] = useState<Record<string, { cohort: string }>>({});
+  const [notes, setNotes] = useState<Record<string, { note: string }>>({});
   const [hidden, setHidden] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +102,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           setTxns(json.transactions as Txn[]);
           setBalances((json.balances || {}) as Record<string, ClientBalance>);
           setCohorts((json.cohorts || {}) as Record<string, { cohort: string }>);
+          setNotes((json.notes || {}) as Record<string, { note: string }>);
           setHidden(false);
           if (json.period?.start && json.period?.end) {
             setDateFrom(json.period.start);
@@ -253,7 +255,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
-        {tab === "client" && <ByClient rows={filtered} balances={balances} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
+        {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
         {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
@@ -264,6 +266,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           fallback={all.filter((t) => t.key === modalKey)}
           clientKey={modalKey}
           cohorts={cohorts}
+          note={notes[modalKey]?.note || ""}
           slug={slug}
           onClose={() => setModalKey(null)}
           onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })}
@@ -369,7 +372,7 @@ function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: {
   );
 }
 
-function ByClient({ rows, balances, sort, setSortKey, arrow, onClient }: { rows: Txn[]; balances: Record<string, ClientBalance>; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void }) {
+function ByClient({ rows, balances, notes, sort, setSortKey, arrow, onClient }: { rows: Txn[]; balances: Record<string, ClientBalance>; notes: Record<string, { note: string }>; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void }) {
   const map = new Map<string, { key: string; client: string; count: number; total: number; products: Set<string>; last: string }>();
   for (const r of rows) {
     const m = map.get(r.key) || { key: r.key, client: r.client, count: 0, total: 0, products: new Set<string>(), last: "" };
@@ -398,7 +401,10 @@ function ByClient({ rows, balances, sort, setSortKey, arrow, onClient }: { rows:
       <tbody>
         {arr.map((o) => (
           <tr key={o.key} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
-            <td className="px-4 py-3"><span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(o.key)}>{o.client}</span></td>
+            <td className="px-4 py-3">
+              <span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(o.key)}>{o.client}</span>
+              {notes[o.key]?.note && <span title={notes[o.key].note} className="ml-1.5 cursor-help">📝</span>}
+            </td>
             <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
             <td className="px-4 py-3 text-right text-gray-600">{o.products}</td>
             <td className="px-4 py-3 text-right font-semibold text-gray-900">{zar2(o.total)}</td>
@@ -463,7 +469,22 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
   );
 }
 
-function ClientModal({ balance, fallback, clientKey, cohorts, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; clientKey: string; cohorts: Record<string, { cohort: string }>; slug: string; onClose: () => void; onChanged: () => void }) {
+function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; clientKey: string; cohorts: Record<string, { cohort: string }>; note: string; slug: string; onClose: () => void; onChanged: () => void }) {
+  const [noteDraft, setNoteDraft] = useState(note);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  async function saveNote() {
+    setNoteSaving(true);
+    setNoteSaved(false);
+    await fetch("/api/ghl/client-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key: clientKey, client: balance?.name || "", note: noteDraft }),
+    });
+    setNoteSaving(false);
+    setNoteSaved(true);
+    onChanged();
+  }
   async function deleteManual(id: string) {
     await fetch(`/api/ghl/manual-payments?slug=${encodeURIComponent(slug)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
     onChanged();
@@ -523,6 +544,22 @@ function ClientModal({ balance, fallback, clientKey, cohorts, slug, onClose, onC
           <div><div className="text-xs uppercase tracking-wide text-gray-400">Total paid</div><div className="text-xl font-semibold text-emerald-600">{zar2(paid)}</div></div>
           <div><div className="text-xs uppercase tracking-wide text-gray-400">Outstanding</div><div className="text-xl font-semibold" style={{ color: outstanding > 0 ? "#e11d48" : "#10b981" }}>{zar2(outstanding)}</div></div>
           <div><div className="text-xs uppercase tracking-wide text-gray-400">Payments</div><div className="text-xl font-semibold text-gray-900">{succ.length}</div></div>
+        </div>
+        <div className="mt-4">
+          <label className="text-xs uppercase tracking-wide text-gray-400">Notes</label>
+          <textarea
+            value={noteDraft}
+            onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }}
+            rows={2}
+            placeholder="Add a note about this client…"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
+          />
+          <div className="flex items-center gap-3 mt-1">
+            <button onClick={saveNote} disabled={noteSaving || noteDraft === note} className="rounded-lg bg-[#4A1942] text-white px-3 py-1 text-xs font-medium hover:bg-[#3a1435] disabled:opacity-40">
+              {noteSaving ? "Saving…" : "Save note"}
+            </button>
+            {noteSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
+          </div>
         </div>
         {[...byProduct.entries()].map(([p, list]) => {
           const ps = list.filter((r) => r.status === "succeeded").reduce((a, r) => a + r.amount, 0);

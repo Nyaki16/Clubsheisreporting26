@@ -192,7 +192,17 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     const cohorts = ((cohortRow?.data as { assignments?: Record<string, { cohort: string }> } | null)?.assignments) || {};
 
-    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances, cohorts });
+    // Per-client free-text notes.
+    const { data: notesRow } = await supabase
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", client.id)
+      .is("period_id", null)
+      .eq("section", "clientNotes")
+      .maybeSingle();
+    const notes = ((notesRow?.data as { notes?: Record<string, { note: string }> } | null)?.notes) || {};
+
+    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances, cohorts, notes });
   } catch (e) {
     console.error("GHL payments feed error:", e);
     return Response.json({ error: String(e) }, { status: 500 });
