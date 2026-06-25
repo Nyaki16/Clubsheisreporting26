@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { isCohortProgram } from "@/lib/ghl/program-pricing";
 
@@ -57,7 +57,7 @@ const Pill = ({ s }: { s: string }) => (
   <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[s] || "bg-gray-100 text-gray-600"}`}>{s}</span>
 );
 
-type Tab = "product" | "client" | "all";
+type Tab = "product" | "client" | "cohort" | "all";
 
 export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const sp = useSearchParams();
@@ -237,7 +237,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
       {/* Tabs */}
       <div className="mt-4 flex gap-2">
-        {([["product", "By Product"], ["client", "By Client"], ["all", "All Payments"]] as [Tab, string][]).map(([t, l]) => (
+        {([["product", "By Product"], ["client", "By Client"], ["cohort", "By Cohort"], ["all", "All Payments"]] as [Tab, string][]).map(([t, l]) => (
           <button
             key={t}
             onClick={() => {
@@ -254,6 +254,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
         {tab === "client" && <ByClient rows={filtered} balances={balances} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
+        {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
 
@@ -570,6 +571,86 @@ function ClientModal({ balance, fallback, clientKey, cohorts, slug, onClose, onC
         })}
       </div>
     </div>
+  );
+}
+
+// Groups clients by program + intake month (from cohort assignments), showing
+// collected vs outstanding per cohort with an expandable roster.
+function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, ClientBalance>; cohorts: Record<string, { cohort: string }>; onClient: (k: string) => void }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  type Member = { key: string; name: string; paid: number; outstanding: number };
+  type Group = { id: string; product: string; month: string; members: Member[]; paid: number; outstanding: number };
+  const groups = new Map<string, Group>();
+  for (const [mapKey, info] of Object.entries(cohorts)) {
+    const cohort = info?.cohort;
+    if (!cohort) continue;
+    const sep = mapKey.indexOf("||");
+    if (sep < 0) continue;
+    const key = mapKey.slice(0, sep);
+    const product = mapKey.slice(sep + 2);
+    const month = cohort.slice(0, 7); // YYYY-MM
+    const bal = balances[key];
+    const prog = bal?.programs.find((p) => p.product === product);
+    const paid = prog?.paid || 0;
+    const outstanding = prog?.outstanding || 0;
+    const id = `${product}__${month}`;
+    const g = groups.get(id) || { id, product, month, members: [], paid: 0, outstanding: 0 };
+    g.members.push({ key, name: bal?.name || "—", paid, outstanding });
+    g.paid += paid;
+    g.outstanding += outstanding;
+    groups.set(id, g);
+  }
+  const arr = [...groups.values()].sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : a.product.localeCompare(b.product)));
+  if (!arr.length) {
+    return <div className="px-4 py-10 text-center text-sm text-gray-400">No cohorts assigned yet. Open a client and set a cohort intake date on a cohort-based program (Core Business English, 90 Days, Junior).</div>;
+  }
+  const monthLabel = (m: string) => {
+    const d = new Date(m + "-01");
+    return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-ZA", { month: "short", year: "numeric" });
+  };
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-400">
+          <th className="px-4 py-3 font-medium">Cohort</th>
+          <th className="px-4 py-3 font-medium text-right">Clients</th>
+          <th className="px-4 py-3 font-medium text-right">Collected</th>
+          <th className="px-4 py-3 font-medium text-right">Outstanding</th>
+        </tr>
+      </thead>
+      <tbody>
+        {arr.map((g) => (
+          <Fragment key={g.id}>
+            <tr className="border-b border-gray-50 hover:bg-gray-50/60 cursor-pointer" onClick={() => setExpanded(expanded === g.id ? null : g.id)}>
+              <td className="px-4 py-3">
+                <span className="font-medium text-gray-900">{g.product}</span>
+                <span className="ml-2 rounded-full bg-[#4A1942]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4A1942]">{monthLabel(g.month)}</span>
+                <span className="ml-2 text-gray-300">{expanded === g.id ? "▾" : "▸"}</span>
+              </td>
+              <td className="px-4 py-3 text-right text-gray-600">{g.members.length}</td>
+              <td className="px-4 py-3 text-right font-semibold text-emerald-600">{zar2(g.paid)}</td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: g.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{g.outstanding > 0 ? zar2(g.outstanding) : "—"}</td>
+            </tr>
+            {expanded === g.id && [...g.members].sort((a, b) => b.outstanding - a.outstanding).map((m) => (
+              <tr key={g.id + m.key} className="border-b border-gray-50 bg-gray-50/40">
+                <td className="px-8 py-2"><span className="text-[#4A1942] cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); onClient(m.key); }}>{m.name}</span></td>
+                <td />
+                <td className="px-4 py-2 text-right text-gray-600">{zar2(m.paid)}</td>
+                <td className="px-4 py-2 text-right" style={{ color: m.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{m.outstanding > 0 ? zar2(m.outstanding) : "—"}</td>
+              </tr>
+            ))}
+          </Fragment>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr className="border-t-2 border-gray-100">
+          <td className="px-4 py-3 font-semibold">Total ({arr.reduce((a, g) => a + g.members.length, 0)} in cohorts)</td>
+          <td />
+          <td className="px-4 py-3 text-right font-semibold text-emerald-600">{zar2(arr.reduce((a, g) => a + g.paid, 0))}</td>
+          <td className="px-4 py-3 text-right font-semibold text-rose-600">{zar2(arr.reduce((a, g) => a + g.outstanding, 0))}</td>
+        </tr>
+      </tfoot>
+    </table>
   );
 }
 
