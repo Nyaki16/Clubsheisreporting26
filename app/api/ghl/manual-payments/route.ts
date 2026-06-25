@@ -15,10 +15,11 @@ export interface ManualPayment {
   key: string; // client key — use an existing client's key to attach to their history
   client: string;
   product: string;
-  amount: number;
+  amount: number; // always positive (magnitude); refund flag marks money going out
   date: string; // ISO
   method: string; // e.g. "EFT"
   note?: string;
+  refund?: boolean; // true = a refund (subtracts from paid)
   createdAt: string;
 }
 
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
     // Ghutte history and reduces outstanding); otherwise key off the name.
     const key = String(body.key || "").trim() || `manual:${client.toLowerCase()}`;
 
+    const refund = body.type === "refund" || body.refund === true;
     const entry: ManualPayment = {
       id: globalThis.crypto.randomUUID(),
       key,
@@ -98,6 +100,7 @@ export async function POST(request: NextRequest) {
       date: new Date(date).toISOString(),
       method: String(body.method || "EFT").trim() || "EFT",
       note: String(body.note || "").trim() || undefined,
+      refund,
       createdAt: new Date().toISOString(),
     };
 

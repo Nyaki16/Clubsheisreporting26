@@ -19,11 +19,12 @@ interface Txn {
 
 interface ProgramBalance {
   product: string;
-  type: "fixed" | "installments" | "oneoff";
+  type: "fixed" | "tiered" | "installments" | "oneoff";
   paid: number;
   count: number;
   outstanding: number;
   expected?: number;
+  tier?: "VIP" | "Standard";
   paymentsMade?: number;
   paymentsExpected?: number;
 }
@@ -91,6 +92,14 @@ const STATUS_STYLE: Record<string, string> = {
 };
 const Pill = ({ s }: { s: string }) => (
   <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[s] || "bg-gray-100 text-gray-600"}`}>{s}</span>
+);
+
+// VIP (90-Day) + Junior level stickers shown next to a client's name.
+const NameBadges = ({ vip, level }: { vip?: boolean; level?: string }) => (
+  <>
+    {vip && <span className="ml-1.5 rounded-full bg-[#C4956A]/25 px-1.5 py-0.5 text-[10px] font-bold text-[#8a5a2b]">VIP</span>}
+    {level && <span className="ml-1.5 rounded-full bg-[#4A1942]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#4A1942]">L{level}</span>}
+  </>
 );
 
 type Tab = "product" | "client" | "cohort" | "all";
@@ -293,7 +302,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
-        {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} cohorts={cohorts} slug={slug} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })} />}
+        {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} cohorts={cohorts} juniorInfo={juniorInfo} slug={slug} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })} />}
         {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
@@ -411,7 +420,7 @@ function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: {
   );
 }
 
-function ByClient({ rows, balances, notes, cohorts, slug, sort, setSortKey, arrow, onClient, onChanged }: { rows: Txn[]; balances: Record<string, ClientBalance>; notes: Record<string, { note: string }>; cohorts: Record<string, { cohort: string }>; slug: string; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void; onChanged: () => void }) {
+function ByClient({ rows, balances, notes, cohorts, juniorInfo, slug, sort, setSortKey, arrow, onClient, onChanged }: { rows: Txn[]; balances: Record<string, ClientBalance>; notes: Record<string, { note: string }>; cohorts: Record<string, { cohort: string }>; juniorInfo: Record<string, { kidName: string; level: string }>; slug: string; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void; onChanged: () => void }) {
   const map = new Map<string, { key: string; client: string; count: number; total: number; products: Set<string>; last: string }>();
   for (const r of rows) {
     const m = map.get(r.key) || { key: r.key, client: r.client, count: 0, total: 0, products: new Set<string>(), last: "" };
@@ -444,6 +453,7 @@ function ByClient({ rows, balances, notes, cohorts, slug, sort, setSortKey, arro
           <tr key={o.key} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
             <td className="px-4 py-3">
               <span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(o.key)}>{o.client}</span>
+              <NameBadges vip={(balances[o.key]?.programs || []).some((p) => p.tier === "VIP")} level={juniorInfo[o.key]?.level} />
             </td>
             <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
             <td className="px-4 py-3 text-right text-gray-600">{o.products}</td>
@@ -595,10 +605,16 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, junior, slug
 
   function balanceBadge(p: ProgramBalance | undefined) {
     if (!p) return null;
-    if (p.type === "fixed") {
-      return p.outstanding > 0
-        ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{zar(p.outstanding)} left of {zar(p.expected || 0)}</span>
-        : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">paid in full</span>;
+    if (p.type === "fixed" || p.type === "tiered") {
+      const tier = p.type === "tiered" ? <span className="mr-1 rounded-full bg-[#C4956A]/20 px-2 py-0.5 text-[11px] font-bold text-[#8a5a2b]">{p.tier}</span> : null;
+      return (
+        <>
+          {tier}
+          {p.outstanding > 0
+            ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{zar(p.outstanding)} left of {zar(p.expected || 0)}</span>
+            : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">paid in full</span>}
+        </>
+      );
     }
     if (p.type === "installments") {
       const made = p.paymentsMade || 0;
@@ -615,7 +631,10 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, junior, slug
       <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-serif text-xl font-semibold text-gray-900">{name}</h3>
+            <h3 className="font-serif text-xl font-semibold text-gray-900 inline-flex items-center">
+              {name}
+              <NameBadges vip={(balance?.programs || []).some((p) => p.tier === "VIP")} level={junior.level} />
+            </h3>
             <p className="text-sm text-gray-500">{history.length} transactions · {products.length} product(s) · all-time</p>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-gray-600">
               {email && <span>✉️ <a href={`mailto:${email}`} className="text-[#4A1942] hover:underline">{email}</a></span>}
@@ -850,6 +869,7 @@ function AddPaymentModal({ slug, clients, products, onClose, onSaved }: { slug: 
   const [date, setDate] = useState(today);
   const [method, setMethod] = useState("EFT");
   const [note, setNote] = useState("");
+  const [type, setType] = useState<"payment" | "refund">("payment");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -866,7 +886,7 @@ function AddPaymentModal({ slug, clients, products, onClose, onSaved }: { slug: 
       const res = await fetch("/api/ghl/manual-payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, key: clientKey || undefined, client: name, product, amount: Number(amount), date, method, note }),
+        body: JSON.stringify({ slug, key: clientKey || undefined, client: name, product, amount: Number(amount), date, method, note, type }),
       });
       const json = await res.json();
       if (json?.success) onSaved();
@@ -911,9 +931,24 @@ function AddPaymentModal({ slug, clients, products, onClose, onSaved }: { slug: 
             )}
           </div>
 
+          <div>
+            <label className="text-xs text-gray-500">Type</label>
+            <div className="mt-1 flex gap-2">
+              {(["payment", "refund"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setType(t)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${type === t ? (t === "refund" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[#4A1942] bg-[#4A1942]/10 text-[#4A1942]") : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                >
+                  {t === "refund" ? "Refund (money out)" : "Payment"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-xs text-gray-500">Amount (R)</label>
+              <label className="text-xs text-gray-500">Amount (R){type === "refund" ? " to refund" : ""}</label>
               <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={inputCls} />
             </div>
             <div className="flex-1">
@@ -937,7 +972,7 @@ function AddPaymentModal({ slug, clients, products, onClose, onSaved }: { slug: 
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
             <button onClick={save} disabled={saving} className="rounded-lg bg-[#4A1942] text-white px-4 py-2 text-sm font-medium hover:bg-[#3a1435] disabled:opacity-50">
-              {saving ? "Saving…" : "Save payment"}
+              {saving ? "Saving…" : type === "refund" ? "Save refund" : "Save payment"}
             </button>
           </div>
         </div>

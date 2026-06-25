@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
         email: "",
         product: canonicalProduct(String(m.product || ""), Number(m.amount) || 0),
         amount: Number(m.amount) || 0,
-        status: "succeeded",
+        status: m.refund ? "refunded" : "succeeded",
         id: String(m.id || ""),
         manual: true,
         method: String(m.method || "EFT"),
@@ -165,14 +165,15 @@ export async function GET(request: NextRequest) {
       history: Row[];
     }> = {};
     for (const [key, { name, rows }] of byClient) {
-      const byProgram = new Map<string, number[]>();
+      const byProgram = new Map<string, { amounts: number[]; refunds: number }>();
       for (const r of rows) {
-        if (r.status !== "succeeded") continue;
-        const list = byProgram.get(r.product) || [];
-        list.push(r.amount);
-        byProgram.set(r.product, list);
+        if (r.status !== "succeeded" && r.status !== "refunded") continue;
+        const g = byProgram.get(r.product) || { amounts: [], refunds: 0 };
+        if (r.status === "refunded") g.refunds += r.amount;
+        else g.amounts.push(r.amount);
+        byProgram.set(r.product, g);
       }
-      const programs = [...byProgram.entries()].map(([product, amounts]) => programBalance(product, amounts));
+      const programs = [...byProgram.entries()].map(([product, g]) => programBalance(product, g.amounts, g.refunds));
       balances[key] = {
         name,
         totalPaid: programs.reduce((a, p) => a + p.paid, 0),
