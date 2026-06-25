@@ -47,6 +47,42 @@ const dtime = (s: string) => {
   return isNaN(d.getTime()) ? s : d.toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
+// Cohorts are classified by Month + weekday, e.g. "July Wednesday".
+// Stored as "YYYY-MM|Weekday".
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+function formatCohort(v: string): string {
+  if (!v) return "";
+  if (v.includes("|")) {
+    const [m, wd] = v.split("|");
+    const d = new Date(m + "-01");
+    const ml = isNaN(d.getTime()) ? m : d.toLocaleDateString("en-ZA", { month: "short", year: "numeric" });
+    return `${ml} · ${wd}`;
+  }
+  // Legacy ISO-date cohort.
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? v : d.toLocaleDateString("en-ZA", { month: "short", year: "numeric" });
+}
+
+function CohortPicker({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [month, setMonth] = useState(value.includes("|") ? value.split("|")[0] : "");
+  const [weekday, setWeekday] = useState(value.includes("|") ? value.split("|")[1] : "");
+  const cls = "rounded border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30";
+  function update(m: string, wd: string) {
+    setMonth(m);
+    setWeekday(wd);
+    onSave(m && wd ? `${m}|${wd}` : ""); // saves once both set; empty clears
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input type="month" value={month} onChange={(e) => update(e.target.value, weekday)} className={cls} />
+      <select value={weekday} onChange={(e) => update(month, e.target.value)} className={cls}>
+        <option value="">weekday…</option>
+        {WEEKDAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+      </select>
+    </span>
+  );
+}
+
 const STATUS_STYLE: Record<string, string> = {
   succeeded: "bg-emerald-50 text-emerald-700",
   pending: "bg-amber-50 text-amber-700",
@@ -595,16 +631,11 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClos
               </div>
               {isCohortProgram(p) && (
                 <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
-                  <span>Cohort intake:</span>
-                  <input
-                    type="date"
-                    defaultValue={cohorts[`${clientKey}||${p}`]?.cohort || ""}
-                    onChange={(e) => saveCohort(p, e.target.value)}
-                    className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
-                  />
+                  <span>Cohort:</span>
+                  <CohortPicker value={cohorts[`${clientKey}||${p}`]?.cohort || ""} onSave={(v) => saveCohort(p, v)} />
                   {cohorts[`${clientKey}||${p}`]?.cohort && (
                     <span className="rounded-full bg-[#4A1942]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4A1942]">
-                      {new Date(cohorts[`${clientKey}||${p}`].cohort).toLocaleDateString("en-ZA", { month: "short", year: "numeric" })} cohort
+                      {formatCohort(cohorts[`${clientKey}||${p}`].cohort)}
                     </span>
                   )}
                 </div>
@@ -670,7 +701,7 @@ function InlineClientEditor({ slug, clientKey, name, programs, cohorts, note, on
         {programs.map((p) => (
           <div key={p} className="flex items-center gap-2 text-xs text-gray-600">
             <span className="min-w-[180px]">{p}</span>
-            <input type="date" defaultValue={cohorts[`${clientKey}||${p}`]?.cohort || ""} onChange={(e) => saveCohort(p, e.target.value)} className={inputCls} />
+            <CohortPicker value={cohorts[`${clientKey}||${p}`]?.cohort || ""} onSave={(v) => saveCohort(p, v)} />
           </div>
         ))}
       </div>
@@ -691,7 +722,7 @@ function InlineClientEditor({ slug, clientKey, name, programs, cohorts, note, on
 function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, ClientBalance>; cohorts: Record<string, { cohort: string }>; onClient: (k: string) => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   type Member = { key: string; name: string; paid: number; outstanding: number };
-  type Group = { id: string; product: string; month: string; members: Member[]; paid: number; outstanding: number };
+  type Group = { id: string; product: string; cohort: string; members: Member[]; paid: number; outstanding: number };
   const groups = new Map<string, Group>();
   for (const [mapKey, info] of Object.entries(cohorts)) {
     const cohort = info?.cohort;
@@ -700,26 +731,21 @@ function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, Cl
     if (sep < 0) continue;
     const key = mapKey.slice(0, sep);
     const product = mapKey.slice(sep + 2);
-    const month = cohort.slice(0, 7); // YYYY-MM
     const bal = balances[key];
     const prog = bal?.programs.find((p) => p.product === product);
     const paid = prog?.paid || 0;
     const outstanding = prog?.outstanding || 0;
-    const id = `${product}__${month}`;
-    const g = groups.get(id) || { id, product, month, members: [], paid: 0, outstanding: 0 };
+    const id = `${product}__${cohort}`;
+    const g = groups.get(id) || { id, product, cohort, members: [], paid: 0, outstanding: 0 };
     g.members.push({ key, name: bal?.name || "—", paid, outstanding });
     g.paid += paid;
     g.outstanding += outstanding;
     groups.set(id, g);
   }
-  const arr = [...groups.values()].sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : a.product.localeCompare(b.product)));
+  const arr = [...groups.values()].sort((a, b) => (a.cohort < b.cohort ? 1 : a.cohort > b.cohort ? -1 : a.product.localeCompare(b.product)));
   if (!arr.length) {
-    return <div className="px-4 py-10 text-center text-sm text-gray-400">No cohorts assigned yet. Open a client and set a cohort intake date on a cohort-based program (Core Business English, 90 Days, Junior).</div>;
+    return <div className="px-4 py-10 text-center text-sm text-gray-400">No cohorts assigned yet. Open a client (or use the ✎ on the By Client tab) and set a cohort (month + weekday) on a cohort-based program (Core Business English, 90 Days, Junior).</div>;
   }
-  const monthLabel = (m: string) => {
-    const d = new Date(m + "-01");
-    return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-ZA", { month: "short", year: "numeric" });
-  };
   return (
     <table className="w-full text-sm">
       <thead>
@@ -736,7 +762,7 @@ function ByCohort({ balances, cohorts, onClient }: { balances: Record<string, Cl
             <tr className="border-b border-gray-50 hover:bg-gray-50/60 cursor-pointer" onClick={() => setExpanded(expanded === g.id ? null : g.id)}>
               <td className="px-4 py-3">
                 <span className="font-medium text-gray-900">{g.product}</span>
-                <span className="ml-2 rounded-full bg-[#4A1942]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4A1942]">{monthLabel(g.month)}</span>
+                <span className="ml-2 rounded-full bg-[#4A1942]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4A1942]">{formatCohort(g.cohort)}</span>
                 <span className="ml-2 text-gray-300">{expanded === g.id ? "▾" : "▸"}</span>
               </td>
               <td className="px-4 py-3 text-right text-gray-600">{g.members.length}</td>
