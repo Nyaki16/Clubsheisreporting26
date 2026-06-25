@@ -255,7 +255,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
-        {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
+        {tab === "client" && <ByClient rows={filtered} balances={balances} notes={notes} cohorts={cohorts} slug={slug} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })} />}
         {tab === "cohort" && <ByCohort balances={balances} cohorts={cohorts} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
@@ -372,7 +372,8 @@ function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: {
   );
 }
 
-function ByClient({ rows, balances, notes, sort, setSortKey, arrow, onClient }: { rows: Txn[]; balances: Record<string, ClientBalance>; notes: Record<string, { note: string }>; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void }) {
+function ByClient({ rows, balances, notes, cohorts, slug, sort, setSortKey, arrow, onClient, onChanged }: { rows: Txn[]; balances: Record<string, ClientBalance>; notes: Record<string, { note: string }>; cohorts: Record<string, { cohort: string }>; slug: string; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void; onChanged: () => void }) {
+  const [editKey, setEditKey] = useState<string | null>(null);
   const map = new Map<string, { key: string; client: string; count: number; total: number; products: Set<string>; last: string }>();
   for (const r of rows) {
     const m = map.get(r.key) || { key: r.key, client: r.client, count: 0, total: 0, products: new Set<string>(), last: "" };
@@ -400,17 +401,41 @@ function ByClient({ rows, balances, notes, sort, setSortKey, arrow, onClient }: 
       </thead>
       <tbody>
         {arr.map((o) => (
-          <tr key={o.key} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
-            <td className="px-4 py-3">
-              <span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(o.key)}>{o.client}</span>
-              {notes[o.key]?.note && <span title={notes[o.key].note} className="ml-1.5 cursor-help">📝</span>}
-            </td>
-            <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
-            <td className="px-4 py-3 text-right text-gray-600">{o.products}</td>
-            <td className="px-4 py-3 text-right font-semibold text-gray-900">{zar2(o.total)}</td>
-            <td className="px-4 py-3 text-right font-semibold" style={{ color: o.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{o.outstanding > 0 ? zar2(o.outstanding) : "—"}</td>
-            <td className="px-4 py-3 text-gray-600">{dshort(o.last)}</td>
-          </tr>
+          <Fragment key={o.key}>
+            <tr className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+              <td className="px-4 py-3">
+                <span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(o.key)}>{o.client}</span>
+                {notes[o.key]?.note && <span title={notes[o.key].note} className="ml-1.5 cursor-help">📝</span>}
+                <button
+                  onClick={() => setEditKey(editKey === o.key ? null : o.key)}
+                  title="Assign cohort / add note"
+                  className="ml-2 text-xs text-gray-400 hover:text-[#4A1942]"
+                >
+                  ✎ {editKey === o.key ? "▾" : ""}
+                </button>
+              </td>
+              <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
+              <td className="px-4 py-3 text-right text-gray-600">{o.products}</td>
+              <td className="px-4 py-3 text-right font-semibold text-gray-900">{zar2(o.total)}</td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: o.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{o.outstanding > 0 ? zar2(o.outstanding) : "—"}</td>
+              <td className="px-4 py-3 text-gray-600">{dshort(o.last)}</td>
+            </tr>
+            {editKey === o.key && (
+              <tr className="bg-gray-50/60 border-b border-gray-100">
+                <td colSpan={6} className="px-4 py-3">
+                  <InlineClientEditor
+                    slug={slug}
+                    clientKey={o.key}
+                    name={o.client}
+                    programs={(balances[o.key]?.programs || []).map((p) => p.product).filter(isCohortProgram)}
+                    cohorts={cohorts}
+                    note={notes[o.key]?.note || ""}
+                    onChanged={onChanged}
+                  />
+                </td>
+              </tr>
+            )}
+          </Fragment>
         ))}
       </tbody>
       <tfoot>
@@ -606,6 +631,56 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClos
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// Inline cohort + notes editor shown when a By Client row is expanded.
+function InlineClientEditor({ slug, clientKey, name, programs, cohorts, note, onChanged }: { slug: string; clientKey: string; name: string; programs: string[]; cohorts: Record<string, { cohort: string }>; note: string; onChanged: () => void }) {
+  const [noteDraft, setNoteDraft] = useState(note);
+  const [savedFlash, setSavedFlash] = useState("");
+  const flash = (m: string) => { setSavedFlash(m); setTimeout(() => setSavedFlash(""), 1500); };
+
+  async function saveCohort(product: string, cohort: string) {
+    await fetch("/api/ghl/cohorts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key: clientKey, client: name, product, cohort }),
+    });
+    flash("Cohort saved");
+    onChanged();
+  }
+  async function saveNote() {
+    await fetch("/api/ghl/client-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key: clientKey, client: name, note: noteDraft }),
+    });
+    flash("Note saved");
+    onChanged();
+  }
+
+  const inputCls = "rounded border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30";
+  return (
+    <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+      <div className="space-y-1.5">
+        <div className="text-[11px] uppercase tracking-wide text-gray-400">Cohort intake</div>
+        {programs.length === 0 && <div className="text-xs text-gray-400">No cohort-based programs.</div>}
+        {programs.map((p) => (
+          <div key={p} className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="min-w-[180px]">{p}</span>
+            <input type="date" defaultValue={cohorts[`${clientKey}||${p}`]?.cohort || ""} onChange={(e) => saveCohort(p, e.target.value)} className={inputCls} />
+          </div>
+        ))}
+      </div>
+      <div className="flex-1 min-w-[220px] space-y-1.5">
+        <div className="text-[11px] uppercase tracking-wide text-gray-400">Note</div>
+        <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={2} placeholder="Add a note…" className={`${inputCls} w-full`} />
+        <div className="flex items-center gap-2">
+          <button onClick={saveNote} disabled={noteDraft === note} className="rounded bg-[#4A1942] text-white px-2.5 py-1 text-xs font-medium hover:bg-[#3a1435] disabled:opacity-40">Save note</button>
+          {savedFlash && <span className="text-xs text-emerald-600">{savedFlash} ✓</span>}
+        </div>
       </div>
     </div>
   );
