@@ -73,34 +73,58 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const [sort, setSort] = useState<{ k: string; dir: number }>({ k: "total", dir: -1 });
   const [modalKey, setModalKey] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const qs = new URLSearchParams({ slug });
-    if (start && end) {
-      qs.set("start", start);
-      qs.set("end", end);
-    } else if (period) {
-      qs.set("period", period);
-    }
-    try {
-      const res = await fetch(`/api/ghl/payments?${qs.toString()}`);
-      const json = await res.json();
-      if (json?.success && Array.isArray(json.transactions)) {
-        setTxns(json.transactions as Txn[]);
-        setBalances((json.balances || {}) as Record<string, ClientBalance>);
-        setHidden(false);
-      } else {
+  // From/To date filter — fetches the payments for exactly these dates. Seeded
+  // from whatever window the global reporting period resolves to.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const load = useCallback(
+    async (params: { start?: string; end?: string; period?: string }) => {
+      setLoading(true);
+      const qs = new URLSearchParams({ slug });
+      if (params.start && params.end) {
+        qs.set("start", params.start);
+        qs.set("end", params.end);
+      } else if (params.period) {
+        qs.set("period", params.period);
+      }
+      try {
+        const res = await fetch(`/api/ghl/payments?${qs.toString()}`);
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.transactions)) {
+          setTxns(json.transactions as Txn[]);
+          setBalances((json.balances || {}) as Record<string, ClientBalance>);
+          setHidden(false);
+          if (json.period?.start && json.period?.end) {
+            setDateFrom(json.period.start);
+            setDateTo(json.period.end);
+          }
+        } else {
+          setHidden(true);
+        }
+      } catch {
         setHidden(true);
       }
-    } catch {
-      setHidden(true);
-    }
-    setLoading(false);
-  }, [slug, period, start, end]);
+      setLoading(false);
+    },
+    [slug],
+  );
 
+  // (Re)load whenever the global reporting period / custom range changes.
   useEffect(() => {
-    load();
-  }, [load]);
+    if (start && end) load({ start, end });
+    else load({ period: period || undefined });
+  }, [slug, period, start, end, load]);
+
+  // Apply an in-dashboard From/To date filter (refetches for exactly those dates).
+  const applyDates = useCallback(
+    (f: string, t: string) => {
+      setDateFrom(f);
+      setDateTo(t);
+      if (f && t && f <= t) load({ start: f, end: t });
+    },
+    [load],
+  );
 
   const all = txns || [];
   const products = useMemo(() => [...new Set(all.map((t) => t.product))].sort(), [all]);
@@ -168,6 +192,14 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           ["succeeded", "Successful only"], ["all", "All statuses"], ["pending", "Pending"], ["failed", "Failed"], ["refunded", "Refunded"],
         ]} />
         <Select label="Product" value={product} onChange={setProduct} options={[["", "All products"], ...products.map((p) => [p, p] as [string, string])]} />
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          From
+          <input type="date" value={dateFrom} onChange={(e) => applyDates(e.target.value, dateTo)} className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30" />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          To
+          <input type="date" value={dateTo} onChange={(e) => applyDates(dateFrom, e.target.value)} className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30" />
+        </label>
         <div className="flex-1" />
         <input
           type="search"
