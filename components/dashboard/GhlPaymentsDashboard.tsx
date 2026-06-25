@@ -13,6 +13,24 @@ interface Txn {
   status: string;
 }
 
+interface ProgramBalance {
+  product: string;
+  type: "fixed" | "installments" | "oneoff";
+  paid: number;
+  count: number;
+  outstanding: number;
+  expected?: number;
+  paymentsMade?: number;
+  paymentsExpected?: number;
+}
+interface ClientBalance {
+  name: string;
+  totalPaid: number;
+  totalOutstanding: number;
+  programs: ProgramBalance[];
+  history: Txn[];
+}
+
 const zar = (n: number) => "R " + Math.round(n).toLocaleString("en-ZA");
 const zar2 = (n: number) => "R " + n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dshort = (s: string) => {
@@ -44,6 +62,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const end = sp.get("end") || "";
 
   const [txns, setTxns] = useState<Txn[] | null>(null);
+  const [balances, setBalances] = useState<Record<string, ClientBalance>>({});
   const [hidden, setHidden] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +87,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       const json = await res.json();
       if (json?.success && Array.isArray(json.transactions)) {
         setTxns(json.transactions as Txn[]);
+        setBalances((json.balances || {}) as Record<string, ClientBalance>);
         setHidden(false);
       } else {
         setHidden(true);
@@ -176,11 +196,17 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
         {tab === "product" && <ByProduct rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
-        {tab === "client" && <ByClient rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
+        {tab === "client" && <ByClient rows={filtered} balances={balances} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
 
-      {modalKey && <ClientModal rows={all.filter((t) => t.key === modalKey)} onClose={() => setModalKey(null)} />}
+      {modalKey && (
+        <ClientModal
+          balance={balances[modalKey]}
+          fallback={all.filter((t) => t.key === modalKey)}
+          onClose={() => setModalKey(null)}
+        />
+      )}
     </div>
   );
 }
@@ -256,7 +282,7 @@ function ByProduct({ rows, sort, setSortKey, arrow, onProduct }: { rows: Txn[]; 
   );
 }
 
-function ByClient({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[]; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void }) {
+function ByClient({ rows, balances, sort, setSortKey, arrow, onClient }: { rows: Txn[]; balances: Record<string, ClientBalance>; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onClient: (k: string) => void }) {
   const map = new Map<string, { key: string; client: string; count: number; total: number; products: Set<string>; last: string }>();
   for (const r of rows) {
     const m = map.get(r.key) || { key: r.key, client: r.client, count: 0, total: 0, products: new Set<string>(), last: "" };
@@ -266,7 +292,8 @@ function ByClient({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[]; so
     if (r.date > m.last) m.last = r.date;
     map.set(r.key, m);
   }
-  let arr = [...map.values()].map((m) => ({ key: m.key, client: m.client, count: m.count, total: m.total, products: m.products.size, last: m.last }));
+  // "total" here = paid this period; "outstanding" = all-time running balance.
+  let arr = [...map.values()].map((m) => ({ key: m.key, client: m.client, count: m.count, total: m.total, products: m.products.size, last: m.last, outstanding: balances[m.key]?.totalOutstanding || 0 }));
   if (!arr.length) return <Empty />;
   arr = sortRows(arr, sort.k, sort.dir);
   return (
@@ -276,7 +303,8 @@ function ByClient({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[]; so
           <Th label="Client" k="client" sort={sort} setSortKey={setSortKey} arrow={arrow} defaultDir={1} />
           <Th label="Payments" k="count" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
           <Th label="Products" k="products" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
-          <Th label="Total paid" k="total" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
+          <Th label="Paid (period)" k="total" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
+          <Th label="Outstanding" k="outstanding" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
           <Th label="Last payment" k="last" sort={sort} setSortKey={setSortKey} arrow={arrow} />
         </tr>
       </thead>
@@ -287,6 +315,7 @@ function ByClient({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[]; so
             <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
             <td className="px-4 py-3 text-right text-gray-600">{o.products}</td>
             <td className="px-4 py-3 text-right font-semibold text-gray-900">{zar2(o.total)}</td>
+            <td className="px-4 py-3 text-right font-semibold" style={{ color: o.outstanding > 0 ? "#e11d48" : "#9ca3af" }}>{o.outstanding > 0 ? zar2(o.outstanding) : "—"}</td>
             <td className="px-4 py-3 text-gray-600">{dshort(o.last)}</td>
           </tr>
         ))}
@@ -297,6 +326,7 @@ function ByClient({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[]; so
           <td className="px-4 py-3 text-right font-semibold">{arr.reduce((a, o) => a + o.count, 0)}</td>
           <td />
           <td className="px-4 py-3 text-right font-semibold">{zar2(arr.reduce((a, o) => a + o.total, 0))}</td>
+          <td className="px-4 py-3 text-right font-semibold">{zar2(arr.reduce((a, o) => a + o.outstanding, 0))}</td>
           <td />
         </tr>
       </tfoot>
@@ -343,37 +373,61 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
   );
 }
 
-function ClientModal({ rows, onClose }: { rows: Txn[]; onClose: () => void }) {
-  const name = rows[0]?.client || "Client";
-  const succ = rows.filter((r) => r.status === "succeeded");
-  const paid = succ.reduce((a, r) => a + r.amount, 0);
-  const products = [...new Set(rows.map((r) => r.product))];
+function ClientModal({ balance, fallback, onClose }: { balance?: ClientBalance; fallback: Txn[]; onClose: () => void }) {
+  const history = balance?.history?.length ? balance.history : fallback;
+  const name = balance?.name || history[0]?.client || "Client";
+  const succ = history.filter((r) => r.status === "succeeded");
+  const paid = balance ? balance.totalPaid : succ.reduce((a, r) => a + r.amount, 0);
+  const outstanding = balance?.totalOutstanding || 0;
+  const products = [...new Set(history.map((r) => r.product))];
+  const progMap = new Map((balance?.programs || []).map((p) => [p.product, p]));
+
   const byProduct = new Map<string, Txn[]>();
-  for (const r of rows) {
+  for (const r of history) {
     const list = byProduct.get(r.product) || [];
     list.push(r);
     byProduct.set(r.product, list);
   }
+
+  function balanceBadge(p: ProgramBalance | undefined) {
+    if (!p) return null;
+    if (p.type === "fixed") {
+      return p.outstanding > 0
+        ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{zar(p.outstanding)} left of {zar(p.expected || 0)}</span>
+        : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">paid in full</span>;
+    }
+    if (p.type === "installments") {
+      const made = p.paymentsMade || 0;
+      const exp = p.paymentsExpected || 0;
+      return p.outstanding > 0
+        ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{made} of {exp} payments · {zar(p.outstanding)} left</span>
+        : <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{made} of {exp} payments · complete</span>;
+    }
+    return <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">once-off</span>;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/50 p-6" onClick={onClose}>
       <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-serif text-xl font-semibold text-gray-900">{name}</h3>
-            <p className="text-sm text-gray-500">{rows.length} transactions · {products.length} product(s)</p>
+            <p className="text-sm text-gray-500">{history.length} transactions · {products.length} product(s) · all-time</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
         </div>
         <div className="mt-4 flex gap-8">
-          <div><div className="text-xs uppercase tracking-wide text-gray-400">Successfully paid</div><div className="text-xl font-semibold text-emerald-600">{zar2(paid)}</div></div>
+          <div><div className="text-xs uppercase tracking-wide text-gray-400">Total paid</div><div className="text-xl font-semibold text-emerald-600">{zar2(paid)}</div></div>
+          <div><div className="text-xs uppercase tracking-wide text-gray-400">Outstanding</div><div className="text-xl font-semibold" style={{ color: outstanding > 0 ? "#e11d48" : "#10b981" }}>{zar2(outstanding)}</div></div>
           <div><div className="text-xs uppercase tracking-wide text-gray-400">Payments</div><div className="text-xl font-semibold text-gray-900">{succ.length}</div></div>
-          <div><div className="text-xs uppercase tracking-wide text-gray-400">Products</div><div className="text-xl font-semibold text-gray-900">{products.length}</div></div>
         </div>
         {[...byProduct.entries()].map(([p, list]) => {
           const ps = list.filter((r) => r.status === "succeeded").reduce((a, r) => a + r.amount, 0);
           return (
             <div key={p} className="mt-5">
-              <div className="text-sm font-semibold text-gray-800">{p} <span className="font-normal text-gray-400">· {zar2(ps)} paid</span></div>
+              <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-gray-800">
+                {p} <span className="font-normal text-gray-400">· {zar2(ps)} paid</span> {balanceBadge(progMap.get(p))}
+              </div>
               <table className="mt-1 w-full text-sm">
                 <tbody>
                   {list.sort((a, b) => (a.date < b.date ? 1 : -1)).map((r, i) => (

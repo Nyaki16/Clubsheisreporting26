@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { authorizeForSlug } from "@/lib/auth";
 import { canonicalProduct } from "@/lib/ghl/product-aliases";
+import { programBalance } from "@/lib/ghl/program-pricing";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -74,26 +75,27 @@ export async function GET(request: NextRequest) {
       end = period.end_date;
     }
 
-    // Page all transactions for the range.
-    const txns: GHLTxn[] = [];
-    let offset = 0;
-    const limit = 100;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const url = `${GHL_BASE}/payments/transactions?altId=${encodeURIComponent(locationId)}&altType=location&startAt=${start}&endAt=${end}&limit=${limit}&offset=${offset}`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${pitKey}`, Version: "2021-07-28", Accept: "application/json" },
-      });
-      if (!res.ok) throw new Error(`GHL payments/transactions error ${res.status}`);
-      const body = await res.json();
-      const rows: GHLTxn[] = body.data || [];
-      txns.push(...rows);
-      const total = body.totalCount ?? txns.length;
-      offset += limit;
-      if (rows.length < limit || offset >= total) break;
+    const headers = { Authorization: `Bearer ${pitKey}`, Version: "2021-07-28", Accept: "application/json" };
+    async function pageTxns(from: string, to: string): Promise<GHLTxn[]> {
+      const out: GHLTxn[] = [];
+      let offset = 0;
+      const limit = 100;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const url = `${GHL_BASE}/payments/transactions?altId=${encodeURIComponent(locationId)}&altType=location&startAt=${from}&endAt=${to}&limit=${limit}&offset=${offset}`;
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`GHL payments/transactions error ${res.status}`);
+        const body = await res.json();
+        const rows: GHLTxn[] = body.data || [];
+        out.push(...rows);
+        const total = body.totalCount ?? out.length;
+        offset += limit;
+        if (rows.length < limit || offset >= total) break;
+      }
+      return out;
     }
 
-    const transactions = txns.map((t) => ({
+    const map = (t: GHLTxn) => ({
       date: t.createdAt || "",
       client: t.contactName || "—",
       key: t.contactId || t.contactEmail || (t.contactName || "").toLowerCase(),
@@ -101,9 +103,52 @@ export async function GET(request: NextRequest) {
       product: canonicalProduct(t.entitySourceName, Number(t.amount) || 0),
       amount: Number(t.amount) || 0,
       status: (t.status || "pending").toLowerCase(),
-    }));
+    });
 
-    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions });
+    // Period feed (what's shown in the tabs) + all-time history (for balances and
+    // the per-client drill-down — outstanding is a running balance, not period-bound).
+    const balanceFloor = `${Math.max(2024, new Date(end).getFullYear() - 2)}-01-01`;
+    const [periodRows, allRows] = await Promise.all([
+      pageTxns(start, end),
+      pageTxns(balanceFloor, end),
+    ]);
+    const transactions = periodRows.map(map);
+    const allTime = allRows.map(map);
+
+    // Per-client all-time balances. paid/count use SUCCEEDED payments only.
+    type Row = ReturnType<typeof map>;
+    const byClient = new Map<string, { name: string; rows: Row[] }>();
+    for (const r of allTime) {
+      const c = byClient.get(r.key) || { name: r.client, rows: [] };
+      c.rows.push(r);
+      byClient.set(r.key, c);
+    }
+    const balances: Record<string, {
+      name: string;
+      totalPaid: number;
+      totalOutstanding: number;
+      programs: ReturnType<typeof programBalance>[];
+      history: Row[];
+    }> = {};
+    for (const [key, { name, rows }] of byClient) {
+      const byProgram = new Map<string, number[]>();
+      for (const r of rows) {
+        if (r.status !== "succeeded") continue;
+        const list = byProgram.get(r.product) || [];
+        list.push(r.amount);
+        byProgram.set(r.product, list);
+      }
+      const programs = [...byProgram.entries()].map(([product, amounts]) => programBalance(product, amounts));
+      balances[key] = {
+        name,
+        totalPaid: programs.reduce((a, p) => a + p.paid, 0),
+        totalOutstanding: programs.reduce((a, p) => a + p.outstanding, 0),
+        programs,
+        history: rows.sort((a, b) => (a.date < b.date ? 1 : -1)),
+      };
+    }
+
+    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances });
   } catch (e) {
     console.error("GHL payments feed error:", e);
     return Response.json({ error: String(e) }, { status: 500 });
