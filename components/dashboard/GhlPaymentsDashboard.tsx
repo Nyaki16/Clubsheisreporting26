@@ -70,7 +70,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const [status, setStatus] = useState("succeeded");
   const [product, setProduct] = useState("");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<{ k: string; dir: number }>({ k: "total", dir: -1 });
+  const [sort, setSort] = useState<{ k: string; dir: number }>({ k: "successful", dir: -1 });
   const [modalKey, setModalKey] = useState<string | null>(null);
 
   // From/To date filter — fetches the payments for exactly these dates. Seeded
@@ -158,6 +158,18 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
     [all, status, product, search],
   );
 
+  // By Product ignores the status filter so it can show the full
+  // Successful / Pending / Failed split per product.
+  const productRows = useMemo(
+    () =>
+      all.filter((t) => {
+        if (product && t.product !== product) return false;
+        if (search && !t.client.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      }),
+    [all, product, search],
+  );
+
   function setSortKey(k: string, defaultDir = -1) {
     setSort((c) => (c.k === k ? { k, dir: -c.dir } : { k, dir: defaultDir }));
   }
@@ -217,7 +229,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
             key={t}
             onClick={() => {
               setTab(t);
-              setSort({ k: t === "all" ? "date" : "total", dir: -1 });
+              setSort({ k: t === "all" ? "date" : t === "product" ? "successful" : "total", dir: -1 });
             }}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === t ? "bg-[#4A1942] text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
           >
@@ -227,7 +239,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
-        {tab === "product" && <ByProduct rows={filtered} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
+        {tab === "product" && <ByProduct rows={productRows} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
         {tab === "client" && <ByClient rows={filtered} balances={balances} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
@@ -261,31 +273,38 @@ const Th = ({ label, k, sort, setSortKey, arrow, num, defaultDir }: { label: str
   </th>
 );
 
+// `rows` here are filtered by product/search but NOT status, so each product
+// shows the full Successful / Pending / Failed split regardless of the status
+// filter (the point: see money stuck in pending at a glance).
 function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: { rows: Txn[]; seedProducts: string[]; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onProduct: (p: string) => void }) {
-  const map = new Map<string, { product: string; count: number; total: number; clients: Set<string> }>();
-  // Seed every product in the period so all show up even with 0 matching the
-  // current status filter (e.g. products with only pending/failed payments).
-  for (const p of seedProducts) map.set(p, { product: p, count: 0, total: 0, clients: new Set<string>() });
+  type Agg = { product: string; clients: Set<string>; successful: number; pending: number; failed: number };
+  const map = new Map<string, Agg>();
+  const seed = (p: string): Agg => {
+    let m = map.get(p);
+    if (!m) { m = { product: p, clients: new Set<string>(), successful: 0, pending: 0, failed: 0 }; map.set(p, m); }
+    return m;
+  };
+  for (const p of seedProducts) seed(p);
   for (const r of rows) {
-    const m = map.get(r.product) || { product: r.product, count: 0, total: 0, clients: new Set<string>() };
-    m.count += 1;
-    m.total += r.amount;
-    m.clients.add(r.key);
-    map.set(r.product, m);
+    const m = seed(r.product);
+    if (r.status === "succeeded") { m.successful += r.amount; m.clients.add(r.key); }
+    else if (r.status === "pending") m.pending += r.amount;
+    else if (r.status === "failed") m.failed += r.amount;
   }
-  let arr = [...map.values()].map((m) => ({ product: m.product, count: m.count, total: m.total, clients: m.clients.size }));
+  let arr = [...map.values()].map((m) => ({ product: m.product, clients: m.clients.size, successful: m.successful, pending: m.pending, failed: m.failed }));
   if (!arr.length) return <Empty />;
-  const max = Math.max(1, ...arr.map((a) => a.total));
+  const max = Math.max(1, ...arr.map((a) => a.successful));
   arr = sortRows(arr, sort.k, sort.dir);
-  const grand = arr.reduce((a, o) => a + o.total, 0);
+  const sum = (k: "successful" | "pending" | "failed") => arr.reduce((a, o) => a + o[k], 0);
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-gray-100">
           <Th label="Product" k="product" sort={sort} setSortKey={setSortKey} arrow={arrow} defaultDir={1} />
-          <Th label="Payments" k="count" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
           <Th label="Clients" k="clients" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
-          <Th label="Total" k="total" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
+          <Th label="Successful" k="successful" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
+          <Th label="Pending" k="pending" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
+          <Th label="Failed" k="failed" sort={sort} setSortKey={setSortKey} arrow={arrow} num />
           <th className="px-4 py-3 text-right font-medium text-[11px] uppercase tracking-wide text-gray-400">Share</th>
         </tr>
       </thead>
@@ -293,12 +312,13 @@ function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: {
         {arr.map((o) => (
           <tr key={o.product} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
             <td className="px-4 py-3"><span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onProduct(o.product)}>{o.product}</span></td>
-            <td className="px-4 py-3 text-right text-gray-600">{o.count}</td>
             <td className="px-4 py-3 text-right text-gray-600">{o.clients}</td>
-            <td className="px-4 py-3 text-right font-semibold text-gray-900">{zar2(o.total)}</td>
+            <td className="px-4 py-3 text-right font-semibold text-emerald-600">{zar2(o.successful)}</td>
+            <td className="px-4 py-3 text-right" style={{ color: o.pending > 0 ? "#d97706" : "#9ca3af" }}>{o.pending > 0 ? zar2(o.pending) : "—"}</td>
+            <td className="px-4 py-3 text-right" style={{ color: o.failed > 0 ? "#e11d48" : "#9ca3af" }}>{o.failed > 0 ? zar2(o.failed) : "—"}</td>
             <td className="px-4 py-3">
               <div className="h-1.5 rounded bg-gray-100 overflow-hidden min-w-[80px]">
-                <div className="h-full rounded" style={{ width: `${Math.round((o.total / max) * 100)}%`, background: "linear-gradient(90deg,#4A1942,#C4956A)" }} />
+                <div className="h-full rounded" style={{ width: `${Math.round((o.successful / max) * 100)}%`, background: "linear-gradient(90deg,#4A1942,#C4956A)" }} />
               </div>
             </td>
           </tr>
@@ -307,9 +327,10 @@ function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: {
       <tfoot>
         <tr className="border-t-2 border-gray-100">
           <td className="px-4 py-3 font-semibold">Total</td>
-          <td className="px-4 py-3 text-right font-semibold">{arr.reduce((a, o) => a + o.count, 0)}</td>
           <td />
-          <td className="px-4 py-3 text-right font-semibold">{zar2(grand)}</td>
+          <td className="px-4 py-3 text-right font-semibold text-emerald-600">{zar2(sum("successful"))}</td>
+          <td className="px-4 py-3 text-right font-semibold text-amber-600">{zar2(sum("pending"))}</td>
+          <td className="px-4 py-3 text-right font-semibold text-rose-600">{zar2(sum("failed"))}</td>
           <td />
         </tr>
       </tfoot>
