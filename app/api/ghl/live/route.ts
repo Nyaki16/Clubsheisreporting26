@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { buildLiveGHL } from "@/lib/ghl/live";
+import { getClientSession, isAdminRequest } from "@/lib/auth";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -22,16 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Auth: admin (any client) or client matching this slug ---
-    const adminCookie = request.cookies.get("admin_session");
-    const isAdmin = adminCookie?.value === "true";
-    if (!isAdmin) {
-      const clientCookie = request.cookies.get("client_session");
-      let sessionSlug: string | null = null;
-      try {
-        sessionSlug = clientCookie?.value ? JSON.parse(clientCookie.value).slug : null;
-      } catch {
-        sessionSlug = null;
-      }
+    if (!(await isAdminRequest(request))) {
+      const sessionSlug = (await getClientSession(request))?.slug ?? null;
       if (sessionSlug !== slug) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }

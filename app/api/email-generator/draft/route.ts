@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) {
       return Response.json({ error: parsed.error }, { status: 400 });
     }
-    if (!isAuthorized(request, parsed.slug)) {
+    if (!(await isAuthorized(request, parsed.slug))) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const brand = getBrand(parsed.slug);

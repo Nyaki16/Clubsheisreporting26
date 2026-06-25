@@ -1,19 +1,14 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServiceClient } from "@/lib/supabase";
+import { isAdminRequest } from "@/lib/auth";
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    const adminCookie = request.cookies.get("admin_session");
-    const authHeader = request.headers.get("authorization");
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (adminPassword && authHeader !== `Bearer ${adminPassword}`) {
-      if (adminCookie?.value !== "true") {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    if (!(await isAdminRequest(request))) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { clientId, periodId } = await request.json();

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { cookies } from "next/headers";
+import { CLIENT_SESSION_TTL, createClientSession, sessionCookieOptions } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,19 +72,13 @@ export async function POST(request: NextRequest) {
         .eq("section", "client_access");
     }
 
-    const isProd = process.env.NODE_ENV === "production";
+    // Signed HMAC token instead of unsigned JSON — clientId/slug can't be forged.
     const cookieStore = await cookies();
-    cookieStore.set("client_session", JSON.stringify({ clientId: client.id, slug: client.slug }), {
-      httpOnly: true,
-      secure: isProd,
-      // SameSite=None + Partitioned so client sessions also work inside the
-      // Ghutte iframe (cross-site). Partitioned (CHIPS) survives third-party
-      // cookie blocking in Chrome.
-      sameSite: isProd ? "none" : "lax",
-      partitioned: isProd,
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-    });
+    cookieStore.set(
+      "client_session",
+      await createClientSession(client.id, client.slug),
+      sessionCookieOptions(CLIENT_SESSION_TTL),
+    );
 
     return Response.json({ success: true, slug: client.slug });
   } catch {

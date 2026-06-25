@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { runMonthlySync } from "@/lib/sync";
+import { getClientSession, isAdminRequest } from "@/lib/auth";
 
 export const maxDuration = 60; // seconds — requires Vercel Pro for >10s
 
@@ -41,24 +42,14 @@ export async function POST(request: NextRequest) {
     // Admins (Bearer password or admin_session) can sync anything. A client
     // session may refresh ONLY its own current month (the embed runs as a
     // client), so we ignore any month/slug it sends and force a safe scope.
-    const authHeader = request.headers.get("authorization");
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    const isAdmin =
-      (!!adminPassword && authHeader === `Bearer ${adminPassword}`) ||
-      request.cookies.get("admin_session")?.value === "true";
+    const isAdmin = await isAdminRequest(request);
 
     let onlySlug: string | undefined = body.slug;
     let useCurrent = !!body.current;
     let makeCurrent = body.slug ? false : body.makeCurrent !== false;
 
     if (!isAdmin) {
-      let sessionSlug: string | null = null;
-      try {
-        const c = request.cookies.get("client_session")?.value;
-        sessionSlug = c ? JSON.parse(c).slug : null;
-      } catch {
-        sessionSlug = null;
-      }
+      const sessionSlug = (await getClientSession(request))?.slug ?? null;
       if (!sessionSlug || (body.slug && body.slug !== sessionSlug)) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
       }

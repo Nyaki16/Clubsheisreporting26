@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { getClientBySlug } from "@/lib/clients";
 import { buildSectionsForRange } from "@/lib/sync/range";
+import { getClientSession, isAdminRequest } from "@/lib/auth";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -26,15 +27,8 @@ export async function GET(request: NextRequest) {
     if (start > end) return Response.json({ error: "start must be on or before end" }, { status: 400 });
 
     // Auth: admin (any client) or client session matching slug.
-    const isAdmin = request.cookies.get("admin_session")?.value === "true";
-    if (!isAdmin) {
-      let sessionSlug: string | null = null;
-      try {
-        const c = request.cookies.get("client_session")?.value;
-        sessionSlug = c ? JSON.parse(c).slug : null;
-      } catch {
-        sessionSlug = null;
-      }
+    if (!(await isAdminRequest(request))) {
+      const sessionSlug = (await getClientSession(request))?.slug ?? null;
       if (sessionSlug !== slug) return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 

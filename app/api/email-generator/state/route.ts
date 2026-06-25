@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
     }
-    if (!isAuthorized(request, slug)) {
+    if (!(await isAuthorized(request, slug))) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     if (!slug) {
       return Response.json({ error: "slug required in body" }, { status: 400 });
     }
-    if (!isAuthorized(request, slug)) {
+    if (!(await isAuthorized(request, slug))) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);
@@ -122,7 +122,7 @@ export async function DELETE(request: NextRequest) {
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
     }
-    if (!isAuthorized(request, slug)) {
+    if (!(await isAuthorized(request, slug))) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const resolved = await resolveClient(slug);

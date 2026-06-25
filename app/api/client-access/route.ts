@@ -1,20 +1,11 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import crypto from "crypto";
-
-function checkAdmin(request: NextRequest) {
-  const adminCookie = request.cookies.get("admin_session");
-  const authHeader = request.headers.get("authorization");
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (adminPassword && authHeader !== `Bearer ${adminPassword}`) {
-    if (adminCookie?.value !== "true") return false;
-  }
-  return true;
-}
+import { isAdminRequest } from "@/lib/auth";
 
 // GET: List all clients with their access settings
 export async function GET(request: NextRequest) {
-  if (!checkAdmin(request)) {
+  if (!(await isAdminRequest(request))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -57,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 // PATCH: Update a client's access settings
 export async function PATCH(request: NextRequest) {
-  if (!checkAdmin(request)) {
+  if (!(await isAdminRequest(request))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -25,7 +25,7 @@ function flattenCampaigns(campaigns: CampaignsResponse["campaigns"]): AdRow[] {
 // GET = read latest cached intelligence (cheap, no Claude call)
 export async function GET(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params;
-  const auth = authorizeForSlug(request, slug);
+  const auth = await authorizeForSlug(request, slug);
   if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const client = await resolveClientBySlug(slug);
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await context.params;
-    const auth = authorizeForSlug(request, slug);
+    const auth = await authorizeForSlug(request, slug);
     if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json().catch(() => ({}))) as RequestBody;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { getClientByLocationId } from "@/lib/clients";
+import { CLIENT_SESSION_TTL, createClientSession, sessionCookieOptions } from "@/lib/auth";
 
 // GHL embed entry point. A single Custom Menu Link in GoHighLevel points here
 // with the current sub-account's id injected via the {{location.id}} merge
@@ -77,19 +78,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const isProd = process.env.NODE_ENV === "production";
   const response = NextResponse.redirect(new URL(`/dashboard/${client.slug}`, request.url));
 
   // Same cross-site cookie settings the admin/client login routes use, so the
-  // session is sent when the dashboard runs inside the Ghutte iframe.
-  response.cookies.set("client_session", JSON.stringify({ clientId: client.id, slug: client.slug }), {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "none" : "lax",
-    partitioned: isProd,
-    maxAge: 60 * 60 * 24 * 30,
-    path: "/",
-  });
+  // session is sent when the dashboard runs inside the Ghutte iframe. Signed so
+  // the client id/slug can't be forged.
+  response.cookies.set(
+    "client_session",
+    await createClientSession(client.id, client.slug),
+    sessionCookieOptions(CLIENT_SESSION_TTL),
+  );
 
   return response;
 }

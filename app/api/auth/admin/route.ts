@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { ADMIN_SESSION_TTL, createAdminSession, sessionCookieOptions } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,19 +11,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Invalid password" }, { status: 401 });
     }
 
-    const isProd = process.env.NODE_ENV === "production";
+    // Signed HMAC token instead of the static "true" — can't be forged.
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", "true", {
-      httpOnly: true,
-      secure: isProd,
-      // SameSite=None + Partitioned so the cookie is sent when the dashboard
-      // runs inside the Ghutte iframe (cross-site context). Partitioned (CHIPS)
-      // keeps it working even when Chrome blocks third-party cookies.
-      sameSite: isProd ? "none" : "lax",
-      partitioned: isProd,
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    cookieStore.set("admin_session", await createAdminSession(), sessionCookieOptions(ADMIN_SESSION_TTL));
 
     return Response.json({ success: true });
   } catch {

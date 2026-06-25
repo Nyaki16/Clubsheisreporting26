@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     if (!slug) {
       return Response.json({ error: "slug required" }, { status: 400 });
     }
-    if (!isAuthorized(request, slug)) {
+    if (!(await isAuthorized(request, slug))) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
     const brand = getBrand(slug);

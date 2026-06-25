@@ -70,7 +70,7 @@ export async function POST(
 ) {
   try {
     const { slug } = await context.params;
-    const auth = authorizeForSlug(request, slug);
+    const auth = await authorizeForSlug(request, slug);
     if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as RequestBody;
