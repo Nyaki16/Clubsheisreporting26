@@ -8,6 +8,7 @@ import { PerformanceTrendChart } from "@/components/dashboard/PerformanceTrendCh
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
 import { ProductSalesChart } from "@/components/dashboard/ProductSalesChart";
 import { OtherRevenue } from "@/components/dashboard/OtherRevenue";
+import { GhlSalesSection } from "@/components/dashboard/GhlSalesSection";
 import { EmailHighlights } from "@/components/dashboard/EmailHighlights";
 
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
@@ -70,6 +71,9 @@ export function OverviewContent({ slug }: { slug: string }) {
           </div>
         </div>
       )}
+
+      {/* Ghutte sales by product + payment status (auto-hides without Ghutte) */}
+      <GhlSalesSection slug={slug} />
 
       {/* Other Revenue */}
       <OtherRevenue slug={slug} />
