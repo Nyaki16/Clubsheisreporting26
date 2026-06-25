@@ -167,7 +167,7 @@ export function OtherRevenue({ slug }: { slug: string }) {
             <div key={i} className="flex items-center gap-3">
               <input
                 type="text"
-                placeholder="Source (e.g. Systeme.io)"
+                placeholder="Source (e.g. Course, Workshop)"
                 value={entry.source}
                 onChange={(e) => updateRow(i, "source", e.target.value)}
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"

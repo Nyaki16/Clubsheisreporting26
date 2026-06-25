@@ -6,7 +6,6 @@ import { KPICardTinted } from "@/components/dashboard/KPICardTinted";
 import { RevenueVsFailedChart } from "@/components/dashboard/RevenueVsFailedChart";
 import { PerformanceTrendChart } from "@/components/dashboard/PerformanceTrendChart";
 import { CampaignSpendChart } from "@/components/dashboard/CampaignSpendChart";
-import { ProductSalesChart } from "@/components/dashboard/ProductSalesChart";
 import { OtherRevenue } from "@/components/dashboard/OtherRevenue";
 import { GhlSalesSection } from "@/components/dashboard/GhlSalesSection";
 import { EmailHighlights } from "@/components/dashboard/EmailHighlights";
@@ -26,8 +25,11 @@ export function OverviewContent({ slug }: { slug: string }) {
   if (loading) return <LoadingSkeleton />;
   if (!data) return <EmptyState message="No overview data available for this period." />;
 
-  // Merge email KPIs into the snapshot
-  const allKpis = [...data.kpis];
+  // Merge email KPIs into the snapshot. Systeme.io is no longer used for
+  // payments — drop any Systeme-sourced KPIs from stored (historical) data.
+  const allKpis = data.kpis.filter(
+    (k) => !/systeme/i.test(k.label) && !/systeme/i.test(k.badge ?? ""),
+  );
   if (emailData?.kpis) {
     allKpis.push(
       { label: "Emails Sent", value: emailData.kpis.totalSent.toLocaleString(), badge: `${emailData.kpis.campaignCount} campaigns`, direction: "up" as const, icon: "mail" },
@@ -77,13 +79,6 @@ export function OverviewContent({ slug }: { slug: string }) {
 
       {/* Other Revenue */}
       <OtherRevenue slug={slug} />
-
-      {/* Product Revenue Breakdown */}
-      {(() => {
-        const d = data as unknown as Record<string, unknown>;
-        const products = d.productBreakdown as { name: string; count: number }[] | undefined;
-        return products && products.length > 0 ? <ProductSalesChart data={products} /> : null;
-      })()}
 
       {/* Missed Revenue */}
       {data.missedRevenue && (

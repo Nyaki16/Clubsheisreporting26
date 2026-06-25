@@ -33,11 +33,6 @@ export function buildOverview(
     }
   }
 
-  // Systeme.io Revenue
-  if (current.systeme && current.systeme.revenue > 0) {
-    kpis.push({ label: "Systeme.io Revenue", value: formatCurrency(current.systeme.revenue), badge: `↑ ${current.systeme.label}`, direction: "up", icon: "dollar" });
-  }
-
   // Ad Spend
   if (ads && ads.spend > 0) {
     const badge = prevAds ? `${calcMoMChange(ads.spend, prevAds.spend) > 0 ? "+" : ""}${calcMoMChange(ads.spend, prevAds.spend).toFixed(0)}%` : `→ ${current.periodLabel}`;
@@ -72,17 +67,7 @@ export function buildOverview(
     kpis.push({ label: "IG Monthly Reach", value: formatNumber(ig.reach), badge, direction: "up", icon: "instagram" });
   }
 
-  // Email Leads
-  if (current.emailLeads) {
-    kpis.push({ label: "Email Leads", value: formatNumber(current.emailLeads), badge: "↑ Systeme.io total", direction: "up", icon: "mail" });
-  }
-
   const result: Record<string, unknown> = { kpis };
-
-  // Product breakdown from Systeme.io
-  if (current.systeme?.products?.length) {
-    result.productBreakdown = current.systeme.products;
-  }
 
   // Paystack section
   if (ps) {
@@ -114,7 +99,7 @@ export function buildOverview(
       adSpend: trendMonths.map(m => m.data.metaAds?.spend || 0),
       newContacts: trendMonths.map(m => m.data.paystack?.successCount || 0),
       revenue: trendMonths.map(m =>
-        (m.data.paystack?.revenue || 0) + (m.data.ghl?.revenue || 0) + (m.data.systeme?.revenue || 0)
+        (m.data.paystack?.revenue || 0) + (m.data.ghl?.revenue || 0)
       ),
     };
   }
