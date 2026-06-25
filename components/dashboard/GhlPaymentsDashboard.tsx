@@ -11,6 +11,9 @@ interface Txn {
   product: string;
   amount: number;
   status: string;
+  id?: string;
+  manual?: boolean;
+  method?: string;
 }
 
 interface ProgramBalance {
@@ -72,6 +75,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ k: string; dir: number }>({ k: "successful", dir: -1 });
   const [modalKey, setModalKey] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   // From/To date filter — fetches the payments for exactly these dates. Seeded
   // from whatever window the global reporting period resolves to.
@@ -220,6 +224,12 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           placeholder="Search client…"
           className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30 min-w-[180px]"
         />
+        <button
+          onClick={() => setAddOpen(true)}
+          className="rounded-lg bg-[#4A1942] text-white px-3 py-1.5 text-sm font-medium hover:bg-[#3a1435] transition-colors"
+        >
+          + Add payment
+        </button>
       </div>
 
       {/* Tabs */}
@@ -248,7 +258,22 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
         <ClientModal
           balance={balances[modalKey]}
           fallback={all.filter((t) => t.key === modalKey)}
+          slug={slug}
           onClose={() => setModalKey(null)}
+          onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })}
+        />
+      )}
+
+      {addOpen && (
+        <AddPaymentModal
+          slug={slug}
+          clients={Object.entries(balances).map(([key, b]) => ({ key, name: b.name })).sort((a, b) => a.name.localeCompare(b.name))}
+          products={products}
+          onClose={() => setAddOpen(false)}
+          onSaved={() => {
+            setAddOpen(false);
+            load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined });
+          }}
         />
       )}
     </div>
@@ -413,7 +438,10 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
             <td className="px-4 py-3"><span className="text-[#4A1942] font-medium cursor-pointer hover:underline" onClick={() => onClient(r.key)}>{r.client}</span></td>
             <td className="px-4 py-3 text-gray-700">{r.product}</td>
             <td className="px-4 py-3 text-right font-medium text-gray-900">{zar2(r.amount)}</td>
-            <td className="px-4 py-3"><Pill s={r.status} /></td>
+            <td className="px-4 py-3">
+              <Pill s={r.status} />
+              {r.manual && <span className="ml-1.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">{r.method || "EFT"}</span>}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -429,7 +457,12 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
   );
 }
 
-function ClientModal({ balance, fallback, onClose }: { balance?: ClientBalance; fallback: Txn[]; onClose: () => void }) {
+function ClientModal({ balance, fallback, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; slug: string; onClose: () => void; onChanged: () => void }) {
+  async function deleteManual(id: string) {
+    await fetch(`/api/ghl/manual-payments?slug=${encodeURIComponent(slug)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    onChanged();
+    onClose();
+  }
   const history = balance?.history?.length ? balance.history : fallback;
   const name = balance?.name || history[0]?.client || "Client";
   const succ = history.filter((r) => r.status === "succeeded");
@@ -490,7 +523,15 @@ function ClientModal({ balance, fallback, onClose }: { balance?: ClientBalance; 
                     <tr key={i} className="border-b border-gray-50 last:border-0">
                       <td className="py-2 text-gray-500 w-40">{dtime(r.date)}</td>
                       <td className="py-2 text-right w-28 font-medium text-gray-900">{zar2(r.amount)}</td>
-                      <td className="py-2 pl-3"><Pill s={r.status} /></td>
+                      <td className="py-2 pl-3">
+                        <Pill s={r.status} />
+                        {r.manual && <span className="ml-1.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">{r.method || "EFT"}</span>}
+                      </td>
+                      <td className="py-2 pl-2 text-right w-8">
+                        {r.manual && r.id && (
+                          <button onClick={() => deleteManual(r.id!)} title="Delete this manual payment" className="text-gray-300 hover:text-rose-500">×</button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -498,6 +539,112 @@ function ClientModal({ balance, fallback, onClose }: { balance?: ClientBalance; 
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function AddPaymentModal({ slug, clients, products, onClose, onSaved }: { slug: string; clients: { key: string; name: string }[]; products: string[]; onClose: () => void; onSaved: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [clientKey, setClientKey] = useState("");      // "" = new client
+  const [clientName, setClientName] = useState("");
+  const [productSel, setProductSel] = useState(products[0] || "");
+  const [productNew, setProductNew] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(today);
+  const [method, setMethod] = useState("EFT");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const product = productSel === "__other__" ? productNew.trim() : productSel;
+  const name = clientKey ? clients.find((c) => c.key === clientKey)?.name || "" : clientName.trim();
+
+  async function save() {
+    setError("");
+    if (!name) return setError("Choose or enter a client.");
+    if (!product) return setError("Choose or enter a product.");
+    if (!(Number(amount) > 0)) return setError("Enter an amount greater than 0.");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/ghl/manual-payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, key: clientKey || undefined, client: name, product, amount: Number(amount), date, method, note }),
+      });
+      const json = await res.json();
+      if (json?.success) onSaved();
+      else { setError(json.error || "Could not save."); setSaving(false); }
+    } catch {
+      setError("Could not save.");
+      setSaving(false);
+    }
+  }
+
+  const inputCls = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30";
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/50 p-6" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <h3 className="font-serif text-xl font-semibold text-gray-900">Add a payment</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">Record a payment made outside Ghutte (EFT, cash, etc.). It counts toward totals and reduces outstanding.</p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="text-xs text-gray-500">Client</label>
+            <select value={clientKey} onChange={(e) => setClientKey(e.target.value)} className={inputCls}>
+              <option value="">+ New client (type name below)</option>
+              {clients.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+            </select>
+            {!clientKey && (
+              <input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="New client name" className={`${inputCls} mt-2`} />
+            )}
+            {clientKey && <p className="text-xs text-gray-400 mt-1">Attaches to {name}&apos;s history (reduces their outstanding).</p>}
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500">Product / programme</label>
+            <select value={productSel} onChange={(e) => setProductSel(e.target.value)} className={inputCls}>
+              {products.map((p) => <option key={p} value={p}>{p}</option>)}
+              <option value="__other__">Other (type below)</option>
+            </select>
+            {productSel === "__other__" && (
+              <input value={productNew} onChange={(e) => setProductNew(e.target.value)} placeholder="Product name" className={`${inputCls} mt-2`} />
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Amount (R)</label>
+              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={inputCls} />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Method</label>
+              <input value={method} onChange={(e) => setMethod(e.target.value)} placeholder="EFT" className={inputCls} />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Note (optional)</label>
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="reference…" className={inputCls} />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-rose-600">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+            <button onClick={save} disabled={saving} className="rounded-lg bg-[#4A1942] text-white px-4 py-2 text-sm font-medium hover:bg-[#3a1435] disabled:opacity-50">
+              {saving ? "Saving…" : "Save payment"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

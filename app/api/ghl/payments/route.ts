@@ -103,7 +103,11 @@ export async function GET(request: NextRequest) {
       product: canonicalProduct(t.entitySourceName, Number(t.amount) || 0),
       amount: Number(t.amount) || 0,
       status: (t.status || "pending").toLowerCase(),
+      id: "" as string,
+      manual: false,
+      method: "" as string,
     });
+    type Row = ReturnType<typeof map>;
 
     // Period feed (what's shown in the tabs) + all-time history (for balances and
     // the per-client drill-down — outstanding is a running balance, not period-bound).
@@ -112,11 +116,41 @@ export async function GET(request: NextRequest) {
       pageTxns(start, end),
       pageTxns(balanceFloor, end),
     ]);
-    const transactions = periodRows.map(map);
-    const allTime = allRows.map(map);
+    const transactions: Row[] = periodRows.map(map);
+    const allTime: Row[] = allRows.map(map);
+
+    // Merge manually-entered payments (EFT etc.) — they count toward totals and
+    // outstanding just like Ghutte payments.
+    const { data: manualRow } = await supabase
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", client.id)
+      .is("period_id", null)
+      .eq("section", "manualPayments")
+      .maybeSingle();
+    const manualEntries = ((manualRow?.data as { entries?: Array<Record<string, unknown>> } | null)?.entries) || [];
+    const endTs = new Date(`${end}T23:59:59.999Z`).getTime();
+    const startTs = new Date(`${start}T00:00:00.000Z`).getTime();
+    for (const m of manualEntries) {
+      const dateIso = String(m.date || "");
+      const t = new Date(dateIso).getTime();
+      const row: Row = {
+        date: dateIso,
+        client: String(m.client || "—"),
+        key: String(m.key || `manual:${String(m.client || "").toLowerCase()}`),
+        email: "",
+        product: canonicalProduct(String(m.product || ""), Number(m.amount) || 0),
+        amount: Number(m.amount) || 0,
+        status: "succeeded",
+        id: String(m.id || ""),
+        manual: true,
+        method: String(m.method || "EFT"),
+      };
+      if (!isNaN(t) && t <= endTs) allTime.push(row); // all-time (up to period end) for balances
+      if (!isNaN(t) && t >= startTs && t <= endTs) transactions.push(row); // period feed
+    }
 
     // Per-client all-time balances. paid/count use SUCCEEDED payments only.
-    type Row = ReturnType<typeof map>;
     const byClient = new Map<string, { name: string; rows: Row[] }>();
     for (const r of allTime) {
       const c = byClient.get(r.key) || { name: r.client, rows: [] };
