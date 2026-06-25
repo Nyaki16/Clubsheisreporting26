@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       client: t.contactName || "—",
       key: t.contactId || t.contactEmail || (t.contactName || "").toLowerCase(),
       email: t.contactEmail || "",
-      product: canonicalProduct(t.entitySourceName),
+      product: canonicalProduct(t.entitySourceName, Number(t.amount) || 0),
       amount: Number(t.amount) || 0,
       status: (t.status || "pending").toLowerCase(),
     }));
