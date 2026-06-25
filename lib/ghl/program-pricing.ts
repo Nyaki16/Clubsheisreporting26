@@ -22,6 +22,12 @@ export function getPricing(product: string): ProgramPricing {
   return PROGRAM_PRICING[product] || { type: "oneoff" };
 }
 
+// Cohort-based programs run in intakes (Core Business English, 90 Days, Junior).
+// These are exactly the priced (non-oneoff) programs.
+export function isCohortProgram(product: string): boolean {
+  return getPricing(product).type !== "oneoff";
+}
+
 export interface ProgramBalance {
   product: string;
   type: ProgramPricing["type"];

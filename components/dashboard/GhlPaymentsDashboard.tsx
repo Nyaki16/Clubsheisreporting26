@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { isCohortProgram } from "@/lib/ghl/program-pricing";
 
 interface Txn {
   date: string;
@@ -66,6 +67,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
 
   const [txns, setTxns] = useState<Txn[] | null>(null);
   const [balances, setBalances] = useState<Record<string, ClientBalance>>({});
+  const [cohorts, setCohorts] = useState<Record<string, { cohort: string }>>({});
   const [hidden, setHidden] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -98,6 +100,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
         if (json?.success && Array.isArray(json.transactions)) {
           setTxns(json.transactions as Txn[]);
           setBalances((json.balances || {}) as Record<string, ClientBalance>);
+          setCohorts((json.cohorts || {}) as Record<string, { cohort: string }>);
           setHidden(false);
           if (json.period?.start && json.period?.end) {
             setDateFrom(json.period.start);
@@ -258,6 +261,8 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
         <ClientModal
           balance={balances[modalKey]}
           fallback={all.filter((t) => t.key === modalKey)}
+          clientKey={modalKey}
+          cohorts={cohorts}
           slug={slug}
           onClose={() => setModalKey(null)}
           onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })}
@@ -457,11 +462,19 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
   );
 }
 
-function ClientModal({ balance, fallback, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; slug: string; onClose: () => void; onChanged: () => void }) {
+function ClientModal({ balance, fallback, clientKey, cohorts, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; clientKey: string; cohorts: Record<string, { cohort: string }>; slug: string; onClose: () => void; onChanged: () => void }) {
   async function deleteManual(id: string) {
     await fetch(`/api/ghl/manual-payments?slug=${encodeURIComponent(slug)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
     onChanged();
     onClose();
+  }
+  async function saveCohort(product: string, cohort: string) {
+    await fetch("/api/ghl/cohorts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key: clientKey, client: balance?.name || "", product, cohort }),
+    });
+    onChanged();
   }
   const history = balance?.history?.length ? balance.history : fallback;
   const name = balance?.name || history[0]?.client || "Client";
@@ -517,6 +530,22 @@ function ClientModal({ balance, fallback, slug, onClose, onChanged }: { balance?
               <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-gray-800">
                 {p} <span className="font-normal text-gray-400">· {zar2(ps)} paid</span> {balanceBadge(progMap.get(p))}
               </div>
+              {isCohortProgram(p) && (
+                <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
+                  <span>Cohort intake:</span>
+                  <input
+                    type="date"
+                    defaultValue={cohorts[`${clientKey}||${p}`]?.cohort || ""}
+                    onChange={(e) => saveCohort(p, e.target.value)}
+                    className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30"
+                  />
+                  {cohorts[`${clientKey}||${p}`]?.cohort && (
+                    <span className="rounded-full bg-[#4A1942]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4A1942]">
+                      {new Date(cohorts[`${clientKey}||${p}`].cohort).toLocaleDateString("en-ZA", { month: "short", year: "numeric" })} cohort
+                    </span>
+                  )}
+                </div>
+              )}
               <table className="mt-1 w-full text-sm">
                 <tbody>
                   {list.sort((a, b) => (a.date < b.date ? 1 : -1)).map((r, i) => (

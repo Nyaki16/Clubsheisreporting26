@@ -182,7 +182,17 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances });
+    // Cohort assignments (intake date per client+program) for cohort-based programs.
+    const { data: cohortRow } = await supabase
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", client.id)
+      .is("period_id", null)
+      .eq("section", "cohorts")
+      .maybeSingle();
+    const cohorts = ((cohortRow?.data as { assignments?: Record<string, { cohort: string }> } | null)?.assignments) || {};
+
+    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances, cohorts });
   } catch (e) {
     console.error("GHL payments feed error:", e);
     return Response.json({ error: String(e) }, { status: 500 });
