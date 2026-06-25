@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Calendar, RefreshCw, FileText, CalendarPlus, X } from "lucide-react";
+import { Calendar, RefreshCw, FileText, CalendarPlus, X } from "lucide-react";
 import Link from "next/link";
 import { KeyDates } from "./KeyDates";
 
@@ -28,7 +28,6 @@ export function DashboardHeader({
   clients,
   currentPeriodId,
   onPeriodChange,
-  onClientChange,
   generatedDate,
 }: Props) {
   const [syncing, setSyncing] = useState(false);
@@ -299,27 +298,8 @@ export function DashboardHeader({
           </div>
         </div>
 
-        {/* Client selector + name */}
+        {/* Client name */}
         <div>
-          <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm mb-2 cursor-pointer backdrop-blur-sm">
-            <select
-              className="bg-transparent border-none text-white font-medium text-sm focus:outline-none cursor-pointer appearance-none pr-5"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) onClientChange(e.target.value);
-              }}
-            >
-              <option value="" disabled className="text-gray-900">
-                Switch client...
-              </option>
-              {clients.map((c) => (
-                <option key={c.slug} value={c.slug} className="text-gray-900">
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="-ml-4 pointer-events-none" />
-          </div>
           <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight">
             {clientName}
           </h1>
