@@ -227,7 +227,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
-        {tab === "product" && <ByProduct rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
+        {tab === "product" && <ByProduct rows={filtered} seedProducts={product ? [] : products} sort={sort} setSortKey={setSortKey} arrow={arrow} onProduct={(p) => { setProduct(p); setTab("all"); }} />}
         {tab === "client" && <ByClient rows={filtered} balances={balances} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
         {tab === "all" && <AllPayments rows={filtered} sort={sort} setSortKey={setSortKey} arrow={arrow} onClient={setModalKey} />}
       </div>
@@ -261,8 +261,11 @@ const Th = ({ label, k, sort, setSortKey, arrow, num, defaultDir }: { label: str
   </th>
 );
 
-function ByProduct({ rows, sort, setSortKey, arrow, onProduct }: { rows: Txn[]; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onProduct: (p: string) => void }) {
+function ByProduct({ rows, seedProducts, sort, setSortKey, arrow, onProduct }: { rows: Txn[]; seedProducts: string[]; sort: { k: string; dir: number }; setSortKey: (k: string, d?: number) => void; arrow: (k: string) => string; onProduct: (p: string) => void }) {
   const map = new Map<string, { product: string; count: number; total: number; clients: Set<string> }>();
+  // Seed every product in the period so all show up even with 0 matching the
+  // current status filter (e.g. products with only pending/failed payments).
+  for (const p of seedProducts) map.set(p, { product: p, count: 0, total: 0, clients: new Set<string>() });
   for (const r of rows) {
     const m = map.get(r.product) || { product: r.product, count: 0, total: 0, clients: new Set<string>() };
     m.count += 1;
