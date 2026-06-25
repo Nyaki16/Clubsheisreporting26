@@ -202,7 +202,17 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     const notes = ((notesRow?.data as { notes?: Record<string, { note: string }> } | null)?.notes) || {};
 
-    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances, cohorts, notes });
+    // Junior programme info (kid name + level) per client.
+    const { data: juniorRow } = await supabase
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", client.id)
+      .is("period_id", null)
+      .eq("section", "juniorInfo")
+      .maybeSingle();
+    const juniorInfo = ((juniorRow?.data as { info?: Record<string, { kidName: string; level: string }> } | null)?.info) || {};
+
+    return Response.json({ success: true, period: { start, end }, generatedAt: new Date().toISOString(), transactions, balances, cohorts, notes, juniorInfo });
   } catch (e) {
     console.error("GHL payments feed error:", e);
     return Response.json({ error: String(e) }, { status: 500 });

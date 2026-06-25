@@ -105,6 +105,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
   const [balances, setBalances] = useState<Record<string, ClientBalance>>({});
   const [cohorts, setCohorts] = useState<Record<string, { cohort: string }>>({});
   const [notes, setNotes] = useState<Record<string, { note: string }>>({});
+  const [juniorInfo, setJuniorInfo] = useState<Record<string, { kidName: string; level: string }>>({});
   const [hidden, setHidden] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -139,6 +140,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           setBalances((json.balances || {}) as Record<string, ClientBalance>);
           setCohorts((json.cohorts || {}) as Record<string, { cohort: string }>);
           setNotes((json.notes || {}) as Record<string, { note: string }>);
+          setJuniorInfo((json.juniorInfo || {}) as Record<string, { kidName: string; level: string }>);
           setHidden(false);
           if (json.period?.start && json.period?.end) {
             setDateFrom(json.period.start);
@@ -303,6 +305,7 @@ export function GhlPaymentsDashboard({ slug }: { slug: string }) {
           clientKey={modalKey}
           cohorts={cohorts}
           note={notes[modalKey]?.note || ""}
+          junior={juniorInfo[modalKey] || { kidName: "", level: "" }}
           slug={slug}
           onClose={() => setModalKey(null)}
           onChanged={() => load(dateFrom && dateTo ? { start: dateFrom, end: dateTo } : start && end ? { start, end } : { period: period || undefined })}
@@ -519,10 +522,34 @@ function AllPayments({ rows, sort, setSortKey, arrow, onClient }: { rows: Txn[];
   );
 }
 
-function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; clientKey: string; cohorts: Record<string, { cohort: string }>; note: string; slug: string; onClose: () => void; onChanged: () => void }) {
+function ClientModal({ balance, fallback, clientKey, cohorts, note, junior, slug, onClose, onChanged }: { balance?: ClientBalance; fallback: Txn[]; clientKey: string; cohorts: Record<string, { cohort: string }>; note: string; junior: { kidName: string; level: string }; slug: string; onClose: () => void; onChanged: () => void }) {
   const [noteDraft, setNoteDraft] = useState(note);
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [contact, setContact] = useState<{ email: string; phone: string } | null>(null);
+  const [kidName, setKidName] = useState(junior.kidName);
+  const [level, setLevel] = useState(junior.level);
+  const [juniorSaved, setJuniorSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/ghl/contact?slug=${encodeURIComponent(slug)}&key=${encodeURIComponent(clientKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j?.contact) setContact(j.contact); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [slug, clientKey]);
+
+  async function saveJunior() {
+    await fetch("/api/ghl/junior-info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, key: clientKey, client: balance?.name || "", kidName, level }),
+    });
+    setJuniorSaved(true);
+    setTimeout(() => setJuniorSaved(false), 1500);
+    onChanged();
+  }
   async function saveNote() {
     setNoteSaving(true);
     setNoteSaved(false);
@@ -555,6 +582,9 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClos
   const outstanding = balance?.totalOutstanding || 0;
   const products = [...new Set(history.map((r) => r.product))];
   const progMap = new Map((balance?.programs || []).map((p) => [p.product, p]));
+  const email = contact?.email || history.find((r) => r.email)?.email || "";
+  const phone = contact?.phone || "";
+  const hasJunior = products.includes("Unforgettable Junior Academy");
 
   const byProduct = new Map<string, Txn[]>();
   for (const r of history) {
@@ -587,6 +617,11 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClos
           <div>
             <h3 className="font-serif text-xl font-semibold text-gray-900">{name}</h3>
             <p className="text-sm text-gray-500">{history.length} transactions · {products.length} product(s) · all-time</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-gray-600">
+              {email && <span>✉️ <a href={`mailto:${email}`} className="text-[#4A1942] hover:underline">{email}</a></span>}
+              {phone && <span>📱 <a href={`tel:${phone}`} className="text-[#4A1942] hover:underline">{phone}</a></span>}
+              {!email && !phone && <span className="text-gray-400">No contact details on file</span>}
+            </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
         </div>
@@ -611,6 +646,28 @@ function ClientModal({ balance, fallback, clientKey, cohorts, note, slug, onClos
             {noteSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
           </div>
         </div>
+        {hasJunior && (
+          <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Junior programme</div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-[11px] text-gray-500">Kid&apos;s name</label>
+                <input value={kidName} onChange={(e) => setKidName(e.target.value)} placeholder="Child's name" className="mt-0.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-gray-500">Level</label>
+                <select value={level} onChange={(e) => setLevel(e.target.value)} className="mt-0.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A1942]/30">
+                  <option value="">—</option>
+                  <option value="1">Level 1</option>
+                  <option value="2">Level 2</option>
+                  <option value="3">Level 3</option>
+                </select>
+              </div>
+              <button onClick={saveJunior} disabled={kidName === junior.kidName && level === junior.level} className="rounded-lg bg-[#4A1942] text-white px-3 py-1.5 text-xs font-medium hover:bg-[#3a1435] disabled:opacity-40">Save</button>
+              {juniorSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
+            </div>
+          </div>
+        )}
         {[...byProduct.entries()].map(([p, list]) => {
           const ps = list.filter((r) => r.status === "succeeded").reduce((a, r) => a + r.amount, 0);
           return (
