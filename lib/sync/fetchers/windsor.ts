@@ -2,6 +2,15 @@ import { WindsorMetaAdsData, WindsorFBOrganicData, WindsorInstagramData, GHLReve
 
 const WINDSOR_BASE = "https://connectors.windsor.ai/all";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Windsor's aggregator endpoint is intermittently empty for a query that has
+// real data behind it — confirmed by hammering the identical request and
+// getting rows on some calls and `data: []` on others, with no error/status
+// difference (observed right after reconnecting the Facebook connector on
+// 18 Aug 2026, but nothing here assumes that's the only time it happens).
+// A single empty response is therefore not trustworthy on its own, so retry
+// a few times before accepting "no data" as real.
 async function windsorQuery(fields: string, dateFrom: string, dateTo: string): Promise<Record<string, unknown>[]> {
   const apiKey = process.env.WINDSOR_API_KEY;
   if (!apiKey) throw new Error("WINDSOR_API_KEY not set");
@@ -12,13 +21,19 @@ async function windsorQuery(fields: string, dateFrom: string, dateTo: string): P
   url.searchParams.set("date_from", dateFrom);
   url.searchParams.set("date_to", dateTo);
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Windsor API error ${res.status}: ${text.slice(0, 200)}`);
+  let lastRows: Record<string, unknown>[] = [];
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Windsor API error ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const json = await res.json();
+    lastRows = json.data || [];
+    if (lastRows.length > 0) return lastRows;
+    if (attempt < 3) await sleep(800 * attempt);
   }
-  const json = await res.json();
-  return json.data || [];
+  return lastRows;
 }
 
 export async function fetchMetaAds(
