@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolvePeriodId } from "@/lib/period-client";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
@@ -49,12 +50,7 @@ export function EmailContent({ slug }: { slug: string }) {
         .from("clients").select("id").eq("slug", slug).single();
       if (!client) { setSyncError("Client not found"); setSyncing(false); return; }
 
-      let periodId = periodParam;
-      if (!periodId) {
-        const { data: period } = await supabase
-          .from("reporting_periods").select("id").eq("is_current", true).single();
-        periodId = period?.id || null;
-      }
+      const periodId = await resolvePeriodId(periodParam);
       if (!periodId) { setSyncError("No active period found"); setSyncing(false); return; }
 
       const res = await fetch("/api/email-stats", {

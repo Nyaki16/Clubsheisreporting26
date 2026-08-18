@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { runMonthlySync } from "@/lib/sync";
 import { getClientSession, isAdminRequest } from "@/lib/auth";
+import { ensurePeriodsThroughCurrent } from "@/lib/periods";
 
 export const maxDuration = 60; // seconds — requires Vercel Pro for >10s
 
@@ -20,6 +21,10 @@ export async function GET(request: NextRequest) {
     const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
 
     const results = await runMonthlySync(prevYear, prevMonth);
+
+    // Open the new month immediately so it's selectable from day one instead of
+    // only appearing once someone syncs it.
+    await ensurePeriodsThroughCurrent();
 
     return Response.json({
       success: true,

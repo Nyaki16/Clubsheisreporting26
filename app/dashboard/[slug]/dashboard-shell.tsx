@@ -19,7 +19,9 @@ export function DashboardShell({ slug, children }: Props) {
   const [clientName, setClientName] = useState("");
   const [periodLabel, setPeriodLabel] = useState("");
   const [currentPeriodId, setCurrentPeriodId] = useState("");
-  const [periods, setPeriods] = useState<{ id: string; label: string }[]>([]);
+  const [periods, setPeriods] = useState<
+    { id: string; label: string; inProgress?: boolean }[]
+  >([]);
   const [clients, setClients] = useState<{ slug: string; name: string }[]>([]);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -46,20 +48,37 @@ export function DashboardShell({ slug, children }: Props) {
   }, [slug, router]);
 
   const loadData = useCallback(async () => {
+    // Periods come from /api/periods rather than straight from Supabase: that
+    // route also creates the month we're currently in, so the dropdown always
+    // offers an up-to-date reporting month even before it has been synced.
     const [clientRes, periodsRes, clientsRes] = await Promise.all([
       supabase.from("clients").select("name").eq("slug", slug).single(),
-      supabase.from("reporting_periods").select("id, label, is_current").order("start_date", { ascending: false }),
+      fetch("/api/periods")
+        .then((r) => r.json())
+        .catch(() => null),
       supabase.from("clients").select("slug, name").eq("is_active", true).order("name"),
     ]);
 
     if (clientRes.data) setClientName(clientRes.data.name);
-    if (periodsRes.data) {
-      setPeriods(periodsRes.data.map((p) => ({ id: p.id, label: p.label })));
-      // Use period from URL if present, otherwise use is_current
+    const periodList: {
+      id: string;
+      period_key: string;
+      label: string;
+      is_current: boolean;
+      in_progress: boolean;
+    }[] = periodsRes?.periods || [];
+    if (periodList.length > 0) {
+      setPeriods(
+        periodList.map((p) => ({ id: p.id, label: p.label, inProgress: p.in_progress }))
+      );
+      // Use the period from the URL if present (it may be an id or a period_key
+      // such as "august-2026"), otherwise the flagged current one.
       const urlPeriod = searchParams.get("period");
-      const selected = urlPeriod
-        ? periodsRes.data.find((p) => p.id === urlPeriod)
-        : periodsRes.data.find((p) => p.is_current);
+      const selected =
+        (urlPeriod && periodList.find((p) => p.id === urlPeriod || p.period_key === urlPeriod)) ||
+        periodList.find((p) => p.id === periodsRes?.currentPeriodId) ||
+        periodList.find((p) => p.is_current) ||
+        null;
       if (selected) {
         setCurrentPeriodId(selected.id);
         setPeriodLabel(selected.label);

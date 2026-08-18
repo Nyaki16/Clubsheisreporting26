@@ -12,7 +12,7 @@ interface Props {
   clientName: string;
   slug?: string;
   periodLabel: string;
-  periods: { id: string; label: string }[];
+  periods: { id: string; label: string; inProgress?: boolean }[];
   clients: { slug: string; name: string }[];
   currentPeriodId: string;
   onPeriodChange: (id: string) => void;
@@ -40,6 +40,9 @@ export function DashboardHeader({
 
   // Admin signal: dashboard-shell only passes clients[] when admin.
   const isAdmin = clients.length > 0;
+
+  // The in-progress month is month-to-date, not a closed-off monthly report.
+  const selectedInProgress = periods.find((p) => p.id === currentPeriodId)?.inProgress ?? false;
 
   // Custom date range (drives every tab via ?start=&end= in the URL).
   const pathname = usePathname();
@@ -170,7 +173,7 @@ export function DashboardHeader({
               >
                 {periods.map((p) => (
                   <option key={p.id} value={p.id} className="text-gray-900">
-                    {p.label}
+                    {p.inProgress ? `${p.label} (in progress)` : p.label}
                   </option>
                 ))}
                 <option value={CUSTOM_VALUE} className="text-gray-900">Custom range…</option>
@@ -291,7 +294,9 @@ export function DashboardHeader({
               )}
             </div>
             <p className="text-sm text-white/80 mt-1">{periodLabel}</p>
-            <p className="text-xs text-white/60">End of Month Report</p>
+            <p className="text-xs text-white/60">
+              {selectedInProgress ? "Month to Date — refresh for latest" : "End of Month Report"}
+            </p>
             {generatedDate && (
               <p className="text-xs text-white/60">Generated {generatedDate}</p>
             )}

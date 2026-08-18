@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { supabase } from "@/lib/supabase";
+import { resolvePeriodId } from "@/lib/period-client";
 import { InsightCard } from "@/components/dashboard/InsightCard";
 import { StrategySection } from "@/components/dashboard/StrategySection";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
@@ -44,13 +45,7 @@ export function InsightsContent({ slug }: { slug: string }) {
         .from("clients").select("id").eq("slug", slug).single();
       if (!client) throw new Error("Client not found");
 
-      const periodParam = searchParams.get("period");
-      let periodId = periodParam;
-      if (!periodId) {
-        const { data: period } = await supabase
-          .from("reporting_periods").select("id").eq("is_current", true).single();
-        periodId = period?.id || null;
-      }
+      const periodId = await resolvePeriodId(searchParams.get("period"));
       if (!periodId) throw new Error("No period found");
 
       const res = await fetch("/api/strategy", {

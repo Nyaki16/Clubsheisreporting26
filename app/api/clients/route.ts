@@ -1,15 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-
-const MONTH_NAMES = [
-  "january", "february", "march", "april", "may", "june",
-  "july", "august", "september", "october", "november", "december",
-];
-
-const MONTH_LABELS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+import { ensurePeriodsThroughCurrent } from "@/lib/periods";
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,33 +91,11 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // 3. Ensure a reporting_period exists for the current month
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
-    const periodKey = `${MONTH_NAMES[month]}-${year}`;
-    const periodLabel = `${MONTH_LABELS[month]} ${year}`;
-    const startDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const endDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-
-    const { data: existingPeriod } = await supabase
-      .from("reporting_periods")
-      .select("id")
-      .eq("period_key", periodKey)
-      .single();
-
-    if (!existingPeriod) {
-      await supabase
-        .from("reporting_periods")
-        .insert({
-          period_key: periodKey,
-          label: periodLabel,
-          start_date: startDate,
-          end_date: endDate,
-          is_current: true,
-        });
-    }
+    // 3. Ensure a reporting_period exists for the current month. This must not
+    // flag the new month as current — that would leave two `is_current` rows,
+    // and every `.eq("is_current", true).single()` in the app would start
+    // failing.
+    await ensurePeriodsThroughCurrent(supabase);
 
     return Response.json({ success: true, slug: client.slug, id: client.id });
   } catch (e) {

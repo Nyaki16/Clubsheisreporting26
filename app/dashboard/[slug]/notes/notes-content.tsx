@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolvePeriodId } from "@/lib/period-client";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { LoadingSkeleton } from "@/components/dashboard/LoadingSkeleton";
 import { Upload, Sparkles, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, ExternalLink, Pencil, Save, X, Plus, Trash2, Download } from "lucide-react";
@@ -83,12 +84,7 @@ export function NotesContent({ slug }: { slug: string }) {
       .from("clients").select("id").eq("slug", slug).single();
     if (!client) throw new Error("Client not found");
 
-    let periodId = periodParam;
-    if (!periodId) {
-      const { data: period } = await supabase
-        .from("reporting_periods").select("id").eq("is_current", true).single();
-      periodId = period?.id || null;
-    }
+    const periodId = await resolvePeriodId(periodParam);
     if (!periodId) throw new Error("No period found");
     return { clientId: client.id, periodId };
   }, [slug, periodParam]);

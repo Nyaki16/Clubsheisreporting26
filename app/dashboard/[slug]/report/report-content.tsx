@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolvePeriodId } from "@/lib/period-client";
 import { Download, ArrowLeft, Sparkles, Send, Copy, Check, Mail, Globe, Loader2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -123,15 +124,11 @@ Club She Is Team`;
     if (!c) return;
     setClient(c);
 
-    let pid = periodParam;
-    if (!pid) {
-      const { data: p } = await supabase.from("reporting_periods").select("id, label").eq("is_current", true).single();
-      if (p) { pid = p.id; setPeriod(p); }
-    } else {
-      const { data: p } = await supabase.from("reporting_periods").select("id, label").eq("id", pid).single();
-      if (p) setPeriod(p);
-    }
+    // `?period=` may be an id or a period_key such as "august-2026".
+    const pid = await resolvePeriodId(periodParam);
     if (!pid) return;
+    const { data: p } = await supabase.from("reporting_periods").select("id, label").eq("id", pid).single();
+    if (p) setPeriod(p);
 
     const { data: rows } = await supabase
       .from("dashboard_data")

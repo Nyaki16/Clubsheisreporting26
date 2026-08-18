@@ -87,6 +87,13 @@ export async function runMonthlySync(
       .select()
       .single();
     period = newPeriod;
+  } else if (makeCurrent && !period.is_current) {
+    // The period row already existed (created by an earlier per-client refresh,
+    // say). Without this the current flag never advances and every dashboard
+    // keeps defaulting to whatever month happened to be flagged months ago.
+    await supabase.from("reporting_periods").update({ is_current: false }).eq("is_current", true);
+    await supabase.from("reporting_periods").update({ is_current: true }).eq("id", period.id);
+    period.is_current = true;
   }
 
   if (!period) throw new Error("Failed to create period");
