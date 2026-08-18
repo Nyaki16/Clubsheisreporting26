@@ -4,13 +4,12 @@ const WINDSOR_BASE = "https://connectors.windsor.ai/all";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Windsor's aggregator endpoint is intermittently empty for a query that has
-// real data behind it — confirmed by hammering the identical request and
-// getting rows on some calls and `data: []` on others, with no error/status
-// difference (observed right after reconnecting the Facebook connector on
-// 18 Aug 2026, but nothing here assumes that's the only time it happens).
-// A single empty response is therefore not trustworthy on its own, so retry
-// a few times before accepting "no data" as real.
+// A single empty response from Windsor isn't fully trustworthy on its own —
+// while chasing an empty-`meta`-section bug on 18 Aug 2026 the same exact
+// request sometimes came back `data: []` and sometimes didn't (root cause
+// there turned out to be field ORDER in one specific query, now fixed in
+// fetchMetaAds — but Windsor's aggregator clearly has room for other
+// transient blips too). Retry a couple of times before accepting "no data".
 async function windsorQuery(fields: string, dateFrom: string, dateTo: string): Promise<Record<string, unknown>[]> {
   const apiKey = process.env.WINDSOR_API_KEY;
   if (!apiKey) throw new Error("WINDSOR_API_KEY not set");
@@ -44,8 +43,13 @@ export async function fetchMetaAds(
   if (!accountIds.length) return null;
 
   try {
+    // Field order matters to Windsor's `all` aggregator: "...,reach,campaign,..."
+    // deterministically returns an empty data:[] (verified by hammering the
+    // endpoint with every field present/absent combination) while the same
+    // fields with "campaign" ahead of "reach" returns full rows every time.
+    // Not a fluke — keep this order.
     const rows = await windsorQuery(
-      "source,spend,impressions,clicks,reach,campaign,account_id",
+      "source,spend,impressions,clicks,campaign,reach,account_id",
       dateFrom,
       dateTo
     );
