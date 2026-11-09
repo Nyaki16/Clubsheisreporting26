@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import crypto from "crypto";
-import { isAdminRequest } from "@/lib/auth";
+import { clearSessionCutoffCache, isAdminRequest } from "@/lib/auth";
 
 // GET: List all clients with their access settings
 export async function GET(request: NextRequest) {
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     isEnabled: accessMap[c.id]?.isEnabled !== false,
     shareToken: (accessMap[c.id]?.shareToken as string) || null,
     lastLogin: (accessMap[c.id]?.lastLogin as string) || null,
+    embedRequiresPassword: accessMap[c.id]?.embedRequiresPassword === true,
   }));
 
   return Response.json({ clients: result });
@@ -81,6 +82,17 @@ export async function PATCH(request: NextRequest) {
       break;
     case "resetPassword":
       currentData.password = password || crypto.randomBytes(4).toString("hex");
+      // Password-gated clients: a new password signs everyone out.
+      if (currentData.embedRequiresPassword) {
+        currentData.sessionsValidAfter = new Date().toISOString();
+      }
+      break;
+    case "toggleEmbedPassword":
+      currentData.embedRequiresPassword = !currentData.embedRequiresPassword;
+      // Switching it on signs out everyone the passwordless embed let in.
+      if (currentData.embedRequiresPassword) {
+        currentData.sessionsValidAfter = new Date().toISOString();
+      }
       break;
     case "regenerateToken":
       currentData.shareToken = crypto.randomBytes(16).toString("hex");
@@ -107,5 +119,6 @@ export async function PATCH(request: NextRequest) {
     });
   }
 
+  clearSessionCutoffCache(clientId);
   return Response.json({ success: true, data: currentData });
 }

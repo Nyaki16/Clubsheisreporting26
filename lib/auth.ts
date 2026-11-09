@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getServiceClient } from "@/lib/supabase";
 
 // Centralised session signing + verification.
 //
@@ -36,10 +37,11 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
-type SessionPayload = Record<string, unknown> & { exp?: number };
+type SessionPayload = Record<string, unknown> & { exp?: number; iat?: number };
 
 async function signSession(payload: Record<string, unknown>, ttlSeconds: number): Promise<string> {
-  const body: SessionPayload = { ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds };
+  const now = Math.floor(Date.now() / 1000);
+  const body: SessionPayload = { ...payload, iat: now, exp: now + ttlSeconds };
   const data = Buffer.from(JSON.stringify(body)).toString("base64url");
   const sig = await globalThis.crypto.subtle.sign("HMAC", await getKey(), enc.encode(data));
   return `${data}.${Buffer.from(sig).toString("base64url")}`;
@@ -118,11 +120,51 @@ export interface ClientSession {
   slug: string;
 }
 
-// Returns the verified client session, or null if absent/invalid/expired.
+// Per-client revocation cutoff (client_access.sessionsValidAfter). Client
+// sessions issued before it are rejected — used when a client switches on
+// "require password in Ghutte", so sessions the passwordless embed handed out
+// stop working. Cached briefly so API calls don't each hit Supabase.
+const cutoffCache = new Map<string, { at: number; cutoff: number }>();
+const CUTOFF_CACHE_MS = 30_000;
+
+export function clearSessionCutoffCache(clientId?: string) {
+  if (clientId) cutoffCache.delete(clientId);
+  else cutoffCache.clear();
+}
+
+async function getSessionCutoff(clientId: string): Promise<number> {
+  const hit = cutoffCache.get(clientId);
+  if (hit && Date.now() - hit.at < CUTOFF_CACHE_MS) return hit.cutoff;
+  let cutoff = 0;
+  try {
+    const { data } = await getServiceClient()
+      .from("dashboard_data")
+      .select("data")
+      .eq("client_id", clientId)
+      .is("period_id", null)
+      .eq("section", "client_access")
+      .limit(1)
+      .maybeSingle();
+    const after = (data?.data as { sessionsValidAfter?: string } | null)?.sessionsValidAfter;
+    if (after) cutoff = Math.floor(new Date(after).getTime() / 1000) || 0;
+  } catch {
+    // Fail open on lookup errors (signature + expiry still enforced).
+  }
+  cutoffCache.set(clientId, { at: Date.now(), cutoff });
+  return cutoff;
+}
+
+// Returns the verified client session, or null if absent/invalid/expired/revoked.
 export async function getClientSession(request: NextRequest): Promise<ClientSession | null> {
   const payload = await verifySession(request.cookies.get("client_session")?.value);
   if (payload && typeof payload.slug === "string") {
-    return { clientId: typeof payload.clientId === "string" ? payload.clientId : "", slug: payload.slug };
+    const clientId = typeof payload.clientId === "string" ? payload.clientId : "";
+    if (clientId) {
+      const cutoff = await getSessionCutoff(clientId);
+      const iat = typeof payload.iat === "number" ? payload.iat : 0;
+      if (cutoff && iat < cutoff) return null;
+    }
+    return { clientId, slug: payload.slug };
   }
   return null;
 }

@@ -13,6 +13,11 @@ import { CLIENT_SESSION_TTL, createClientSession, sessionCookieOptions } from "@
 // cookie, and redirect to that client's dashboard. Because only users already
 // authenticated inside a sub-account can see the menu link, the location id
 // acts as the credential — no password prompt (mirrors the shareToken model).
+//
+// Exception: a client whose client_access has `embedRequiresPassword: true`
+// gets NO session from the embed. We redirect to the dashboard, the shell finds
+// no valid session and sends them to /login?client=<slug> for the client
+// password (inside the same iframe).
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +84,18 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(new URL(`/dashboard/${client.slug}`, request.url));
+
+  const { data: accessRow } = await supabase
+    .from("dashboard_data")
+    .select("data")
+    .eq("client_id", client.id)
+    .is("period_id", null)
+    .eq("section", "client_access")
+    .limit(1)
+    .maybeSingle();
+  if ((accessRow?.data as { embedRequiresPassword?: boolean } | null)?.embedRequiresPassword) {
+    return response;
+  }
 
   // Same cross-site cookie settings the admin/client login routes use, so the
   // session is sent when the dashboard runs inside the Ghutte iframe. Signed so

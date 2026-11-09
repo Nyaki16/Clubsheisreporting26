@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, RefreshCw, Eye, EyeOff, Mail, Link2, ArrowLeft, Shield, ShieldOff } from "lucide-react";
+import { Copy, Check, RefreshCw, Eye, EyeOff, Mail, Link2, ArrowLeft, Shield, ShieldOff, Lock } from "lucide-react";
 
 interface ClientAccess {
   id: string;
@@ -12,6 +12,7 @@ interface ClientAccess {
   isEnabled: boolean;
   shareToken: string | null;
   lastLogin: string | null;
+  embedRequiresPassword: boolean;
 }
 
 export default function ClientAccessPage() {
@@ -206,6 +207,33 @@ Club She Is Team`;
                         <RefreshCw size={14} className={actionLoading === `${client.id}-regenerateToken` ? "animate-spin" : ""} />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Ghutte embed password gate */}
+                  <div className={`rounded-lg p-4 flex items-center justify-between gap-3 md:col-span-2 ${client.embedRequiresPassword ? "bg-[#4A1942]/5" : "bg-gray-50"}`}>
+                    <div>
+                      <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 font-medium mb-1 flex items-center gap-1">
+                        <Lock size={11} /> Password in Ghutte
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {client.embedRequiresPassword
+                          ? "On: anyone opening the dashboard from inside Ghutte must enter this client's password."
+                          : "Off: anyone in this Ghutte sub-account opens the dashboard without a password."}
+                      </p>
+                    </div>
+                    <button
+                      role="switch"
+                      aria-checked={client.embedRequiresPassword}
+                      aria-label="Require password in Ghutte"
+                      onClick={() => {
+                        if (!client.embedRequiresPassword && !confirm(`Require a password for ${client.name} inside Ghutte? Everyone currently signed in to this client's dashboard will need to enter the password again.`)) return;
+                        handleAction(client.id, "toggleEmbedPassword");
+                      }}
+                      disabled={actionLoading === `${client.id}-toggleEmbedPassword`}
+                      className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${client.embedRequiresPassword ? "bg-[#4A1942]" : "bg-gray-300"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${client.embedRequiresPassword ? "translate-x-5" : ""}`} />
+                    </button>
                   </div>
 
                   {/* Send Email */}
